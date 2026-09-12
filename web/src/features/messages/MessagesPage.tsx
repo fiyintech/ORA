@@ -1,4 +1,6 @@
-import { ArrowDown, ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Plus, Search, Send, Smile, Trash2, UserPlus, Video, X } from "lucide-react";
+import {  Pause,
+  Play,
+  Square, ArrowDown, ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Plus, Search, Send, Smile, Trash2, UserPlus, Video, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -118,6 +120,7 @@ export default function MessagesPage() {
   const [search, setSearch] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [recording, setRecording] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingDurationMs, setRecordingDurationMs] = useState(0);
   const recordingDurationMsRef = useRef(0);
@@ -378,66 +381,175 @@ export default function MessagesPage() {
   };
 
   function clearRecordingTimer() {
-    if (recordingTimerRef.current !== null) { window.clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }
+
+  function getActiveRecordingMs() {
+    const current = recordingDurationMsRef.current;
+    const startedAt = recordingStartedRef.current;
+    if (!startedAt) return current;
+    return current + Math.max(0, Date.now() - startedAt);
   }
 
   function stopRecording() {
-    mediaRecorderRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    recordingDurationMsRef.current = getActiveRecordingMs();
+    setRecordingDurationMs(recordingDurationMsRef.current);
+    recorder.stop();
     clearRecordingTimer();
+  }
+
+  function pauseRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== "recording") return;
+
+    recordingDurationMsRef.current = getActiveRecordingMs();
+    setRecordingDurationMs(recordingDurationMsRef.current);
+    recorder.pause();
+    recordingStartedRef.current = 0;
+    setRecordingPaused(true);
+  }
+
+  function resumeRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== "paused") return;
+
+    recordingStartedRef.current = Date.now();
+    recorder.resume();
+    setRecordingPaused(false);
   }
 
   async function startRecording() {
     if (recording || sending) return;
+
     let remainingAtStart = voiceRemainingMs;
     if (!premiumActive) {
       if (remainingAtStart === null) remainingAtStart = await refreshVoiceAllowance();
-      if (remainingAtStart === null) { setError("Unable to check your daily voice-note allowance. Please try again."); return; }
-      if (remainingAtStart <= 0) { setError("Your 60-second Standard voice-note allowance has been used for today. It resets tomorrow."); return; }
+      if (remainingAtStart === null) {
+        setError("Unable to check your daily voice-note allowance. Please try again.");
+        return;
+      }
+      if (remainingAtStart <= 0) {
+        setError("Your 60-second Standard voice-note allowance has been used for today. It resets tomorrow.");
+        return;
+      }
     }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setError("Voice notes are not supported by this browser."); return; }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice notes are not supported by this browser.");
+      return;
+    }
+
     try {
       setError("");
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferred = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find((type) => MediaRecorder.isTypeSupported(type));
-      const recorder = preferred ? new MediaRecorder(stream, { mimeType: preferred }) : new MediaRecorder(stream);
-        recordingChunksRef.current = [];
+      const preferred = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg",
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+
+      const recorder = preferred
+        ? new MediaRecorder(stream, { mimeType: preferred })
+        : new MediaRecorder(stream);
+
+      recordingChunksRef.current = [];
       recordingStartedRef.current = Date.now();
       recordingDurationMsRef.current = 0;
+
       setRecordingDurationMs(0);
       setRecordingSeconds(0);
+      setRecordingPaused(false);
       setRecording(true);
       mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) recordingChunksRef.current.push(event.data); };
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) recordingChunksRef.current.push(event.data);
+      };
+
       recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const rawDurationMs = Date.now() - recordingStartedRef.current;
-        const durationMs = !premiumActive && voiceRemainingMs !== null
-          ? Math.min(rawDurationMs, Math.max(0, voiceRemainingMs))
-          : rawDurationMs;
+        if (recordingStartedRef.current) {
+          recordingDurationMsRef.current = getActiveRecordingMs();
+        }
+
+        const durationMs = !premiumActive && remainingAtStart !== null
+          ? Math.min(
+              recordingDurationMsRef.current,
+              Math.max(0, remainingAtStart),
+            )
+          : recordingDurationMsRef.current;
+
         recordingDurationMsRef.current = durationMs;
         setRecordingDurationMs(durationMs);
+        setRecordingSeconds(Math.floor(durationMs / 1000));
+
+        stream.getTracks().forEach((track) => track.stop());
+
         const mime = recorder.mimeType || preferred || "audio/webm";
         const blob = new Blob(recordingChunksRef.current, { type: mime });
-        const extension = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-        if (blob.size > 50 * 1024 * 1024) { setError("Voice note is too large. Keep it under 50 MB."); }
-        else { setAttachments([new File([blob], `voice-note.${extension}`, { type: mime })]); setError(""); }
+        const extension = mime.includes("mp4")
+          ? "m4a"
+          : mime.includes("ogg")
+            ? "ogg"
+            : "webm";
+
+        if (blob.size > 50 * 1024 * 1024) {
+          setError("Voice note is too large. Keep it under 50 MB.");
+        } else if (blob.size > 0) {
+          setAttachments([
+            new File([blob], `voice-note.${extension}`, { type: mime }),
+          ]);
+          setError("");
+        }
+
         setRecording(false);
+        setRecordingPaused(false);
         mediaRecorderRef.current = null;
         recordingChunksRef.current = [];
+        recordingStartedRef.current = 0;
         clearRecordingTimer();
       };
+
       recorder.start(250);
-      const allowanceAtStartMs = premiumActive ? null : Math.max(0, remainingAtStart ?? 0);
+
+      const allowanceAtStartMs = premiumActive
+        ? null
+        : Math.max(0, remainingAtStart ?? 0);
+
+      clearRecordingTimer();
       recordingTimerRef.current = window.setInterval(() => {
-        const elapsedMs = Date.now() - recordingStartedRef.current;
-        setRecordingSeconds(Math.floor(elapsedMs / 1000));
-        if (!premiumActive && allowanceAtStartMs !== null && elapsedMs >= allowanceAtStartMs) stopRecording();
+        const activeMs = getActiveRecordingMs();
+
+        setRecordingDurationMs(activeMs);
+        setRecordingSeconds(Math.floor(activeMs / 1000));
+
+        if (
+          !premiumActive &&
+          allowanceAtStartMs !== null &&
+          activeMs >= allowanceAtStartMs
+        ) {
+          stopRecording();
+        }
       }, 100);
     } catch (err) {
       setRecording(false);
-      setError(err instanceof DOMException && err.name === "NotAllowedError" ? "Microphone access was denied. Allow microphone access to record a voice note." : "Unable to start voice recording.");
+      setRecordingPaused(false);
+      mediaRecorderRef.current = null;
+
+      setError(
+        err instanceof DOMException && err.name === "NotAllowedError"
+          ? "Microphone access was denied. Allow microphone access to record a voice note."
+          : "Unable to start voice recording.",
+      );
     }
   }
+
   async function sendMessage() {
     if (!selectedId || sending || (!text.trim() && attachments.length === 0)) return;
     const body = text.trim();
@@ -590,7 +702,46 @@ export default function MessagesPage() {
             </button>
           ) : null}
           <div className="ora-composer shrink-0 border-t px-3 py-2.5 sm:px-4">
-            {recording && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200">Recording voice note · {recordingSeconds}s{!premiumActive ? ` / ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s remaining today` : ""} · tap the stop button when finished</div>}
+            {recording && (
+              <div className="mx-auto mb-2 flex max-w-3xl items-center gap-3 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${recordingPaused ? "bg-amber-400" : "bg-red-500 animate-pulse"}`} />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-red-200">
+                      {recordingPaused ? "Voice note paused" : "Recording voice note"}
+                    </p>
+                    <p className="text-[10px] text-red-300/70">
+                      {recordingSeconds}s
+                      {!premiumActive
+                        ? ` / ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s remaining today`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={recordingPaused ? resumeRecording : pauseRecording}
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+                  aria-label={recordingPaused ? "Resume recording" : "Pause recording"}
+                  title={recordingPaused ? "Resume recording" : "Pause recording"}
+                >
+                  {recordingPaused ? <Play size={14} /> : <Pause size={14} />}
+                  {recordingPaused ? "Resume" : "Pause"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white transition hover:bg-red-500"
+                  aria-label="Stop recording"
+                  title="Stop recording"
+                >
+                  <Square size={13} fill="currentColor" />
+                  Stop
+                </button>
+              </div>
+            )}
             {attachments.length > 0 && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
               <div className="mb-2 flex items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
@@ -609,7 +760,7 @@ export default function MessagesPage() {
                   <button type="button" onClick={() => { setComposerPanel("emoji"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900"><Smile size={17} />Emoji</button>
                   <button type="button" onClick={() => { setComposerPanel(null); fileRef.current?.click(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900"><ImagePlus size={17} />Photo{premiumActive ? "s" : ""}</button>
                   <button type="button" onClick={() => { if (!premiumActive) { navigate("/premium"); return; } setComposerPanel(null); document.getElementById("ora-video-input")?.click(); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-900" : "ora-premium-locked text-amber-200"}`}><Video size={17} />Video{premiumActive ? "" : " · Power Hour"}</button>
-                  <button type="button" onClick={() => { setComposerPanel(null); if (recording) stopRecording(); else void startRecording(); }} disabled={sending} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${recording ? "text-red-300" : "text-zinc-200 hover:bg-zinc-900"}`}><Mic size={17} />{recording ? `Stop recording · ${recordingSeconds}s` : "Voice note"}</button>
+                  <button type="button" onClick={() => { setComposerPanel(null); if (!recording) void startRecording(); }} disabled={sending || recording} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"><Mic size={17} />Voice note</button>
                 </div> : null}
               </div><div className="min-w-0 flex-1"><textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} rows={1} maxLength={maxMessageLength} disabled={sending} placeholder={attachments.length > 0 ? "Add a caption…" : "Type a message"} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-600" /><div className="mt-1 flex justify-end px-1 text-[10px] text-zinc-600">{text.length}/{maxMessageLength}</div></div><button type="submit" disabled={sending || recording || (!text.trim() && attachments.length === 0)} className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">{sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}</button></form>
           </div>
