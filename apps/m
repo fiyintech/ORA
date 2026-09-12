@@ -1,0 +1,252 @@
+import "package:mobile/core/utils/result.dart";
+import "package:mobile/core/backend/repositories/profile_repository.dart";
+import "package:mobile/core/backend/supabase_client.dart";
+import "package:mobile/core/utils/logger.dart";
+
+class ProfileRepositoryImpl implements ProfileRepository {
+  @override
+  Future<Result<Map<String, dynamic>?>> getProfile(String userId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(null);
+    }
+
+    try {
+      final response = await SupabaseClientProvider.client!
+          .from('profiles')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      return Result.success(response);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to fetch profile from Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return Result.success(null);
+    }
+  }
+
+  @override
+  Future<Result<void>> updateProfile(String userId, Map<String, dynamic> data) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(null);
+    }
+
+    try {
+      await SupabaseClientProvider.client!
+          .from('profiles')
+          .update(data)
+          .eq('user_id', userId);
+      return Result.success(null);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to update profile in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return Result.failure(Failure('Failed to update profile: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> updateCompletion(String userId, int percentage) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(null);
+    }
+
+    try {
+      await SupabaseClientProvider.client!
+          .from('profiles')
+          .update({'profile_completed': percentage})
+          .eq('user_id', userId);
+      return Result.success(null);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to update profile completion.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return Result.failure(Failure('Failed to update completion: $e'));
+    }
+  }
+
+  @override
+  Future<Result<String>> updateAvatar(String userId, String imagePath) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(imagePath);
+    }
+
+    try {
+      // Upload to Supabase storage bucket 'avatars'
+      final fileName = imagePath.split('/').last;
+      final fileBytes = await Future.value(null); // TODO: Read local file bytes
+      // TODO: Upload to storage bucket 'avatars' with path avatars/{userId}/{fileName}
+      // final response = await SupabaseClientProvider.client!
+      //     .storage
+      //     .from('avatars')
+      //     .uploadBinary('$userId/$fileName', fileBytes!);
+
+      // Update profile avatar path
+      await SupabaseClientProvider.client!
+          .from('profiles')
+          .update({'avatar': imagePath})
+          .eq('user_id', userId);
+
+      return Result.success(imagePath);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to update avatar in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return Result.success(imagePath);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getProfileStats(String userId) async {
+    // Start with real zero values — no fake placeholders.
+    final stats = <String, dynamic>{
+      'posts': 0,
+      'likes': 0,
+      'comments': 0,
+      'hoods': 0,
+      'followers': 0,
+      'following': 0,
+      'aura': 0,
+      'username': '',
+      'fullName': '',
+    };
+
+    if (!SupabaseClientProvider.isInitialized) {
+      return stats;
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+
+      // Fetch profile info (username, fullName, aura)
+      final profile = await client
+          .from('profiles')
+          .select('username, display_name, aura_points')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      stats['username'] = profile?['username'] ?? '';
+      stats['fullName'] = profile?['display_name'] ?? profile?['username'] ?? '';
+      stats['aura'] = profile?['aura_points'] ?? 0;
+
+      // Fetch in parallel using Future.wait
+      final results = await Future.wait([
+        // Posts count
+        client
+            .from('posts')
+            .select('id')
+            .eq('user_id', userId)
+            .count(),
+        // Likes received (posts authored by user)
+        client
+            .from('post_likes')
+            .select('post_id', const FetchOptions(count: CountOption.exact))
+            .eq('post_id', ''),
+        // Comments count (on user's posts)
+        client
+            .from('comments')
+            .select('id', const FetchOptions(count: CountOption.exact))
+            .eq('post_id', ''),
+        // Followers count
+        client
+            .from('followers')
+            .select('follower_id', const FetchOptions(count: CountOption.exact))
+            .eq('following_id', userId),
+        // Following count
+        client
+            .from('followers')
+            .select('following_id', const FetchOptions(count: CountOption.exact))
+            .eq('follower_id', userId),
+      ]);
+
+      // Posts count
+      stats['posts'] = results[0].count ?? 0;
+
+      // Likes received - count post_likes where post_id is in user's posts
+      final postLikes = await client
+          .from('post_likes')
+          .select('post_id', const FetchOptions(count: CountOption.exact))
+          .inFilter('post_id', await _getUserPostIds(userId));
+      stats['likes'] = postLikes.count ?? 0;
+
+      // Comments count - count comments where post_id is in user's posts
+      final comments = await client
+          .from('comments')
+          .select('id', const FetchOptions(count: CountOption.exact))
+          .inFilter('post_id', await _getUserPostIds(userId));
+      stats['comments'] = comments.count ?? 0;
+
+      // Followers count
+      final followers = await client
+          .from('followers')
+          .select('follower_id', const FetchOptions(count: CountOption.exact))
+          .eq('following_id', userId);
+      stats['followers'] = followers.count ?? 0;
+
+      // Following count
+      final following = await client
+          .from('followers')
+          .select('following_id', const FetchOptions(count: CountOption.exact))
+          .eq('follower_id', userId);
+      stats['following'] = following.count ?? 0;
+
+      return stats;
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to fetch profile stats from Supabase. Returning zeros.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return stats;
+    }
+  }
+
+  /// Helper to fetch all post IDs authored by a user.
+  Future<List<dynamic>> _getUserPostIds(String userId) async {
+    try {
+      final posts = await SupabaseClientProvider.client!
+          .from('posts')
+          .select('id')
+          .eq('user_id', userId);
+      return posts.map((p) => p['id']).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getAchievements(String userId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return [];
+    }
+
+    try {
+      final response = await SupabaseClientProvider.client!
+          .from('achievements')
+          .select('*, user_achievements!inner(*)')
+          .eq('user_achievements.user_id', userId);
+      return response;
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to fetch achievements from Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'ProfileRepository',
+      );
+      return [];
+    }
+  }
+}

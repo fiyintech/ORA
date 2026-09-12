@@ -1,0 +1,5 @@
+-- ORA chat view-once media contract.
+-- The live mark_message_media_viewed RPC grants a 12-second expiry after the
+-- recipient opens the media. The cleanup Edge Function consumes the message
+-- and removes its Storage object after that window, including on the scheduled
+-- background cleanup path.

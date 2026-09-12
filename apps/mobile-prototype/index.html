@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ORA</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Splash Screen -->
+  <div id="splash" class="screen active">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <span class="splash-icon"><img src="assets/logo.svg" alt="ORA" class="logo"></span>
+        <h1>ORA</h1>
+      </div>
+      <p class="splash-tagline">Build your vibe.</p>
+    </div>
+  </div>
+
+  <!-- Onboarding Screen -->
+  <div id="onboarding" class="screen">
+    <div class="onboarding-content">
+      <div class="onboarding-icon"><img src="assets/logo.svg" alt="ORA" class="logo"></div>
+      <h2>Welcome to ORA</h2>
+      <p class="onboarding-subtitle">The social platform where your vibe builds your world.</p>
+      <div class="onboarding-features">
+        <div class="onboarding-feature">
+          <span class="feature-icon">✦</span>
+          <div>
+            <strong>Build Your Aura</strong>
+            <p>Your reputation grows with every connection.</p>
+          </div>
+        </div>
+        <div class="onboarding-feature">
+          <span class="feature-icon">▲</span>
+          <div>
+            <strong>Level Up Your Steeze</strong>
+            <p>Progress through ranks as you engage.</p>
+          </div>
+        </div>
+        <div class="onboarding-feature">
+          <span class="feature-icon">◆</span>
+          <div>
+            <strong>Find Your Hood</strong>
+            <p>Join communities that match your vibe.</p>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="navigateTo('login')">Get Started</button>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="login" class="screen">
+    <div class="auth-container">
+      <div class="auth-header">
+        <div class="auth-logo"><img src="assets/logo.svg" alt="ORA" class="logo"></div>
+        <h2>Welcome back</h2>
+        <p>Sign in to continue to ORA</p>
+      </div>
+      <form class="auth-form" onsubmit="return false;">
+        <div class="input-group">
+          <label for="email">Email or phone</label>
+          <input type="text" id="email" placeholder="Enter your email or phone" value="demo@ora.app">
+        </div>
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter your password" value="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" onclick="navigateTo('home')">Sign In</button>
+      </form>
+      <p class="auth-footer">Don't have an account? <a href="#" onclick="return false;">Sign up</a></p>
+    </div>
+  </div>
+
+  <!-- Main App Container -->
+  <div id="app" class="screen">
+    <!-- Header -->
+    <header id="app-header">
+      <div class="header-left">
+        <span class="header-logo"><img src="assets/logo.svg" alt="ORA" class="logo"></span>
+        <span class="header-title">ORA</span>
+      </div>
+      <div class="header-right">
+        <span class="aura-badge">
+          <span class="aura-icon">✦</span>
+          <span id="header-aura">185</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- Home Screen -->
+    <div id="page-home" class="page active">
+      <!-- Personal Identity -->
+      <div class="home-identity">
+        <div class="home-avatar">D</div>
+        <div class="home-identity-text">
+          <h2 class="home-name">Demi A.</h2>
+          <p class="home-status">Building my vibe, one connection at a time.</p>
+        </div>
+      </div>
+
+      <!-- Aura Section -->
+      <div class="home-aura-section">
+        <div class="aura-visual">
+          <img src="assets/logo.svg" alt="ORA" class="aura-logo">
+        </div>
+        <div class="aura-rank-badge">Active Member</div>
+        <div class="aura-score">185</div>
+        <div class="aura-meta">
+          <span class="aura-change positive">+3 this week</span>
+          <span class="aura-label">Aura</span>
+        </div>
+      </div>
+
+      <!-- Steeze Level Section -->
+      <div class="home-steeze-section">
+        <div class="steeze-header">
+          <div>
+            <span class="steeze-level">Level 3</span>
+            <span class="steeze-rank">Active Member</span>
+          </div>
+        </div>
+        <div class="steeze-progress-container">
+          <div class="steeze-progress-bar" style="width: 15%"></div>
+        </div>
+        <div class="steeze-xp">45 / 300 XP to Level 4</div>
+      </div>
+
+      <!-- Quick Access -->
+      <div class="section">
+        <div class="quick-actions">
+          <div class="quick-action" onclick="navigateTo('chats')">
+            <span class="qa-icon">💬</span>
+            <span>Chats</span>
+          </div>
+          <div class="quick-action" onclick="navigateTo('hoods')">
+            <span class="qa-icon">◆</span>
+            <span>Hoods</span>
+          </div>
+          <div class="quick-action" onclick="navigateTo('gbedu')">
+            <span class="qa-icon">🎵</span>
+            <span>Gbedu</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity / Progress -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Your Journey</h3>
+        </div>
+        <div class="activity-list">
+          <div class="activity-item">
+            <div class="activity-avatar">C</div>
+            <div class="activity-body">
+              <strong>Chidi</strong> replied to your message
+              <div class="activity-time">2m ago</div>
+            </div>
+            <div class="activity-aura positive">+2</div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar">A</div>
+            <div class="activity-body">
+              <strong>Amara</strong> sent you a hood invite
+              <div class="activity-time">15m ago</div>
+            </div>
+            <div class="activity-aura positive">+3</div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar">K</div>
+            <div class="activity-body">
+              <strong>Kelechi</strong> liked your post
+              <div class="activity-time">1h ago</div>
+            </div>
+            <div class="activity-aura positive">+1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chats Screen -->
+    <div id="page-chats" class="page">
+      <div class="page-header">
+        <h2>Chats</h2>
+      </div>
+      <div class="search-bar">
+        <input type="text" placeholder="Search messages..." value="">
+      </div>
+
+      <!-- Horizontal Tabs -->
+      <div class="chats-tabs">
+        <div class="chat-tab active" data-tab="chats" onclick="switchChatTab('chats')">Chats</div>
+        <div class="chat-tab" data-tab="hoods" onclick="switchChatTab('hoods')">Hoods</div>
+        <div class="chat-tab" data-tab="favorites" onclick="switchChatTab('favorites')">Favorites</div>
+      </div>
+
+      <!-- Chats Tab Content -->
+      <div id="tab-chats" class="tab-content active">
+        <div class="chat-list">
+          <!-- Pinned -->
+          <div class="chat-item pinned">
+            <div class="chat-pinned-indicator">📌</div>
+            <div class="chat-avatar" style="background:#6C5CE7;">C</div>
+            <div class="chat-info">
+              <div class="chat-name">Chidi Okonkwo</div>
+              <div class="chat-preview">Abeg, make we link up later?</div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">2m</div>
+              <div class="chat-badge">3</div>
+            </div>
+          </div>
+          <div class="chat-item pinned">
+            <div class="chat-pinned-indicator">📌</div>
+            <div class="chat-avatar" style="background:#00B894;">A</div>
+            <div class="chat-info">
+              <div class="chat-name">Amara Okafor</div>
+              <div class="chat-preview">I just joined the Creatives hood!</div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">15m</div>
+            </div>
+          </div>
+
+          <!-- Recent -->
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#E17055;">Z</div>
+            <div class="chat-info">
+              <div class="chat-name">Zainab Bello</div>
+              <div class="chat-preview">Are you coming to the meetup?</div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">3h</div>
+              <div class="chat-badge">1</div>
+            </div>
+          </div>
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#0984E3;">E</div>
+            <div class="chat-info">
+              <div class="chat-name">Efe Martins</div>
+              <div class="chat-preview">Oya, check the new hood rules</div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">5h</div>
+            </div>
+          </div>
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#6C5CE7;">C</div>
+            <div class="chat-info">
+              <div class="chat-name">Chidiii</div>
+              <div class="chat-preview">
+                <span class="chat-identity">💬 Music chat</span>
+                Abeg, make we link up later?
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">2m</div>
+              <div class="chat-badge">3</div>
+            </div>
+          </div>
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#FDCB6E; color:#2D3436;">K</div>
+            <div class="chat-info">
+              <div class="chat-name">Kel-B</div>
+              <div class="chat-preview">
+                <span class="chat-identity">🎵 Gbedu room</span>
+                That gbedu wey you send me dey hit o!
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">1h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hoods Tab Content -->
+      <div id="tab-hoods" class="tab-content">
+        <div class="chat-list">
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#5B3CD8;">🎵</div>
+            <div class="chat-info">
+              <div class="chat-name">Music Heads</div>
+              <div class="chat-preview">
+                <span class="chat-identity">🎧 Community</span>
+                New track dropped in the hood!
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">2h</div>
+            </div>
+          </div>
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#00B894;">◆</div>
+            <div class="chat-info">
+              <div class="chat-name">Tech Connect</div>
+              <div class="chat-preview">
+                <span class="chat-identity">💻 Community</span>
+                Check the new hood rules
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">4h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Favorites Tab Content -->
+      <div id="tab-favorites" class="tab-content">
+        <div class="chat-list">
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#6C5CE7;">C</div>
+            <div class="chat-info">
+              <div class="chat-name">Chidiii</div>
+              <div class="chat-preview">
+                <span class="chat-identity">💬 Music chat</span>
+                Abeg, make we link up later?
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">2m</div>
+              <div class="chat-badge">3</div>
+            </div>
+          </div>
+          <div class="chat-item">
+            <div class="chat-avatar" style="background:#FDCB6E; color:#2D3436;">K</div>
+            <div class="chat-info">
+              <div class="chat-name">Kel-B</div>
+              <div class="chat-preview">
+                <span class="chat-identity">🎵 Gbedu room</span>
+                That gbedu wey you send me dey hit o!
+              </div>
+            </div>
+            <div class="chat-meta">
+              <div class="chat-time">1h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hoods Screen -->
+    <div id="page-hoods" class="page">
+      <div class="page-header">
+        <h2>Hoods</h2>
+      </div>
+      <div class="search-bar">
+        <input type="text" placeholder="Search hoods..." value="">
+      </div>
+
+      <!-- Recommended Hoods -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Recommended for You</h3>
+        </div>
+        <div class="hoods-discovery">
+          <div class="hood-discovery-card">
+            <div class="hood-discovery-cover" style="background: linear-gradient(135deg, #6C5CE7, #A29BFE);">
+              <div class="hood-discovery-badge">Featured</div>
+            </div>
+            <div class="hood-discovery-info">
+              <div class="hood-discovery-header">
+                <h4>Creatives</h4>
+                <span class="hood-category">Art & Design</span>
+              </div>
+              <p class="hood-discovery-desc">For the artists, designers, and visionaries shaping culture.</p>
+              <div class="hood-discovery-meta">
+                <span class="hood-members-count">1.2k members</span>
+                <span class="hood-aura-indicator">
+                  <span class="hood-aura-icon">✦</span>
+                  <span class="hood-aura-value">2,400</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hood-discovery-card">
+            <div class="hood-discovery-cover" style="background: linear-gradient(135deg, #00B894, #55EFC4);">
+              <div class="hood-discovery-badge">Trending</div>
+            </div>
+            <div class="hood-discovery-info">
+              <div class="hood-discovery-header">
+                <h4>Tech Connect</h4>
+                <span class="hood-category">Technology</span>
+              </div>
+              <p class="hood-discovery-desc">Developers, builders, and tech enthusiasts building the future.</p>
+              <div class="hood-discovery-meta">
+                <span class="hood-members-count">856 members</span>
+                <span class="hood-aura-indicator">
+                  <span class="hood-aura-icon">✦</span>
+                  <span class="hood-aura-value">890</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hood-discovery-card">
+            <div class="hood-discovery-cover" style="background: linear-gradient(135deg, #E17055, #FAB1A0);">
+              <div class="hood-discovery-badge">Popular</div>
+            </div>
+            <div class="hood-discovery-info">
+              <div class="hood-discovery-header">
+                <h4>Music Heads</h4>
+                <span class="hood-category">Entertainment</span>
+              </div>
+              <p class="hood-discovery-desc">All about gbedu, from Afrobeats to Alté. Vibes only.</p>
+              <div class="hood-discovery-meta">
+                <span class="hood-members-count">2.1k members</span>
+                <span class="hood-aura-indicator">
+                  <span class="hood-aura-icon">✦</span>
+                  <span class="hood-aura-value">3,100</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Your Hoods -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Your Hoods</h3>
+        </div>
+        <div class="hoods-list">
+          <div class="hood-card">
+            <div class="hood-cover" style="background: linear-gradient(135deg, #6C5CE7, #A29BFE);">
+              <div class="hood-name-badge">Creatives</div>
+            </div>
+            <div class="hood-info">
+              <div class="hood-founder">
+                <span class="hood-founder-label">Founded by</span>
+                <span class="hood-founder-name">Amara Okafor</span>
+              </div>
+              <div class="hood-members">1.2k members</div>
+              <div class="hood-status">
+                <span class="hood-status-badge elite">Elite</span>
+                <span class="hood-aura-mini">
+                  <span class="hood-aura-icon">✦</span>
+                  <span>2,400 Aura</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="hood-card">
+            <div class="hood-cover" style="background: linear-gradient(135deg, #00B894, #55EFC4);">
+              <div class="hood-name-badge">Tech Connect</div>
+            </div>
+            <div class="hood-info">
+              <div class="hood-founder">
+                <span class="hood-founder-label">Founded by</span>
+                <span class="hood-founder-name">Chidi Okonkwo</span>
+              </div>
+              <div class="hood-members">856 members</div>
+              <div class="hood-status">
+                <span class="hood-status-badge rising">Rising</span>
+                <span class="hood-aura-mini">
+                  <span class="hood-aura-icon">✦</span>
+                  <span>890 Aura</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="hood-card">
+            <div class="hood-cover" style="background: linear-gradient(135deg, #E17055, #FAB1A0);">
+              <div class="hood-name-badge">Music Heads</div>
+            </div>
+            <div class="hood-info">
+              <div class="hood-founder">
+                <span class="hood-founder-label">Founded by</span>
+                <span class="hood-founder-name">Kelechi Nnamdi</span>
+              </div>
+              <div class="hood-members">2.1k members</div>
+              <div class="hood-status">
+                <span class="hood-status-badge elite">Elite</span>
+                <span class="hood-aura-mini">
+                  <span class="hood-aura-icon">✦</span>
+                  <span>3,100 Aura</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gbedu Screen -->
+    <div id="page-gbedu" class="page">
+      <div class="page-header">
+        <h2>Gbedu</h2>
+      </div>
+
+      <!-- Your Vibe Identity -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Your Vibe</h3>
+        </div>
+        <div class="gbedu-identity-card">
+          <div class="gbedu-identity-header">
+            <div class="gbedu-current-vibe">
+              <span class="vibe-label">Current Vibe</span>
+              <span class="vibe-value">Afrobeats & Alté</span>
+            </div>
+            <span class="gbedu-aura-badge">
+              <span class="gbedu-aura-icon">✦</span>
+              <span>185</span>
+            </span>
+          </div>
+          <div class="gbedu-genres">
+            <span class="genre-tag">Afrobeats</span>
+            <span class="genre-tag">Alté</span>
+            <span class="genre-tag">Amapiano</span>
+            <span class="genre-tag">Afropop</span>
+          </div>
+          <div class="gbedu-mood-tags">
+            <span class="mood-tag">Chill</span>
+            <span class="mood-tag">Vibey</span>
+            <span class="mood-tag">Social</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trending Gbedu -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Trending Now</h3>
+        </div>
+        <div class="gbedu-trending">
+          <div class="gbedu-trending-card">
+            <div class="gbedu-trending-cover" style="background: linear-gradient(135deg, #5B3CD8, #1A0A3E);">
+              <div class="gbedu-trending-badge">Featured Mix</div>
+            </div>
+            <div class="gbedu-trending-info">
+              <h4>Afrobeats Mix 2024</h4>
+              <p class="gbedu-trending-desc">Curated sounds from Lagos to London</p>
+              <div class="gbedu-trending-meta">
+                <span class="gbedu-category">Afrobeats</span>
+                <span class="gbedu-plays">12.5k plays</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="gbedu-trending-card">
+            <div class="gbedu-trending-cover" style="background: linear-gradient(135deg, #00B894, #0A0A0B);">
+              <div class="gbedu-trending-badge">Trending</div>
+            </div>
+            <div class="gbedu-trending-info">
+              <h4>Alté Nights</h4>
+              <p class="gbedu-trending-desc">Underground sounds for the culture</p>
+              <div class="gbedu-trending-meta">
+                <span class="gbedu-category">Alté</span>
+                <span class="gbedu-plays">8.3k plays</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="gbedu-trending-card">
+            <div class="gbedu-trending-cover" style="background: linear-gradient(135deg, #E17055, #0A0A0B);">
+              <div class="gbedu-trending-badge">Hot</div>
+            </div>
+            <div class="gbedu-trending-info">
+              <h4>Amapiano Fridays</h4>
+              <p class="gbedu-trending-desc">Deep house vibes from SA to the world</p>
+              <div class="gbedu-trending-meta">
+                <span class="gbedu-category">Amapiano</span>
+                <span class="gbedu-plays">15.2k plays</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Featured Tracks -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Featured Tracks</h3>
+        </div>
+        <div class="gbedu-list">
+          <div class="gbedu-item">
+            <div class="gbedu-cover" style="background:#6C5CE7;">🎵</div>
+            <div class="gbedu-info">
+              <div class="gbedu-title">Rush</div>
+              <div class="gbedu-artist">Ayra Starr</div>
+            </div>
+            <div class="gbedu-duration">3:45</div>
+          </div>
+          <div class="gbedu-item">
+            <div class="gbedu-cover" style="background:#00B894;">🎵</div>
+            <div class="gbedu-info">
+              <div class="gbedu-title">Last Last</div>
+              <div class="gbedu-artist">Burna Boy</div>
+            </div>
+            <div class="gbedu-duration">3:52</div>
+          </div>
+          <div class="gbedu-item">
+            <div class="gbedu-cover" style="background:#E17055;">🎵</div>
+            <div class="gbedu-info">
+              <div class="gbedu-title">Sability</div>
+              <div class="gbedu-artist">Ayra Starr</div>
+            </div>
+            <div class="gbedu-duration">3:00</div>
+          </div>
+          <div class="gbedu-item">
+            <div class="gbedu-cover" style="background:#0984E3;">🎵</div>
+            <div class="gbedu-info">
+              <div class="gbedu-title">City Boys</div>
+              <div class="gbedu-artist">Burna Boy</div>
+            </div>
+            <div class="gbedu-duration">3:33</div>
+          </div>
+          <div class="gbedu-item">
+            <div class="gbedu-cover" style="background:#FDCB6E; color:#2D3436;">🎵</div>
+            <div class="gbedu-info">
+              <div class="gbedu-title">Who Is Your Guy?</div>
+              <div class="gbedu-artist">Spyro</div>
+            </div>
+            <div class="gbedu-duration">3:20</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Creators & Culture -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Creators & Culture</h3>
+        </div>
+        <div class="gbedu-creators">
+          <div class="gbedu-creator-card">
+            <div class="creator-avatar" style="background:#6C5CE7;">A</div>
+            <div class="creator-info">
+              <div class="creator-name">Ayra Starr</div>
+              <div class="creator-role">Artist</div>
+            </div>
+            <span class="creator-followers">2.1M followers</span>
+          </div>
+          <div class="gbedu-creator-card">
+            <div class="creator-avatar" style="background:#00B894;">B</div>
+            <div class="creator-info">
+              <div class="creator-name">Burna Boy</div>
+              <div class="creator-role">Artist</div>
+            </div>
+            <span class="creator-followers">5.8M followers</span>
+          </div>
+          <div class="gbedu-creator-card">
+            <div class="creator-avatar" style="background:#E17055;">S</div>
+            <div class="creator-info">
+              <div class="creator-name">Spyro</div>
+              <div class="creator-role">Producer</div>
+            </div>
+            <span class="creator-followers">890k followers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Screen -->
+    <div id="page-profile" class="page">
+        <!-- Identity Header -->
+        <div class="profile-identity-header">
+          <div class="profile-avatar-large">D</div>
+          <div class="profile-identity-info">
+            <h2 class="profile-name">Demi A.</h2>
+            <p class="profile-handle">@demi_ora</p>
+            <span class="profile-status-badge">Active Member</span>
+          </div>
+        </div>
+        <div class="profile-bio-section">
+          <p class="profile-bio">Building my vibe, one connection at a time. 🚀</p>
+        </div>
+
+        <!-- Aura Display -->
+        <div class="section">
+          <div class="profile-aura-card">
+            <div class="aura-visual-large">
+              <img src="assets/logo.svg" alt="ORA" class="aura-logo-large">
+            </div>
+            <div class="aura-content">
+              <div class="aura-rank-badge-large">Active Member</div>
+              <div class="aura-score-large">185</div>
+              <div class="aura-meta">
+                <span class="aura-change positive">+3 this week</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steeze Level -->
+        <div class="section">
+          <div class="profile-steeze-card">
+            <div class="steeze-header">
+              <div>
+                <span class="steeze-level-large">Level 3</span>
+                <span class="steeze-rank">Active Member</span>
+              </div>
+            </div>
+            <div class="steeze-progress-container">
+              <div class="steeze-progress-bar" style="width: 15%"></div>
+            </div>
+            <div class="steeze-xp">45 / 300 XP to Level 4</div>
+          </div>
+        </div>
+
+      <!-- Current Vibe -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Current Vibe</h3>
+        </div>
+        <div class="profile-vibe-card">
+          <div class="vibe-mood">
+            <span class="mood-label">Mood</span>
+            <span class="mood-value">Chill & Social</span>
+          </div>
+          <div class="vibe-genres">
+            <span class="genre-tag">Afrobeats</span>
+            <span class="genre-tag">Alté</span>
+            <span class="genre-tag">Amapiano</span>
+          </div>
+          <div class="vibe-personality">
+            <span class="personality-tag">Creative</span>
+            <span class="personality-tag">Social</span>
+            <span class="personality-tag">Vibey</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Achievements -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Achievements</h3>
+        </div>
+        <div class="achievements-list">
+          <div class="achievement-item">
+            <div class="achievement-icon gold">✦</div>
+            <div class="achievement-info">
+              <div class="achievement-title">First Wave</div>
+              <div class="achievement-desc">Among the first to join ORA</div>
+            </div>
+            <span class="achievement-badge">+150 Aura</span>
+          </div>
+          <div class="achievement-item">
+            <div class="achievement-icon purple">◆</div>
+            <div class="achievement-info">
+              <div class="achievement-title">Hood Architect</div>
+              <div class="achievement-desc">Built a thriving community</div>
+            </div>
+            <span class="achievement-badge">+300 Aura</span>
+          </div>
+          <div class="achievement-item locked">
+            <div class="achievement-icon">🔒</div>
+            <div class="achievement-info">
+              <div class="achievement-title">ORA Icon</div>
+              <div class="achievement-desc">Reach 10,000 Aura</div>
+            </div>
+            <span class="achievement-badge">Locked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hoods -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Your Hoods</h3>
+        </div>
+        <div class="profile-hoods">
+          <div class="profile-hood">
+            <span class="profile-hood-dot" style="background:#6C5CE7;"></span>
+            <span>Creatives</span>
+          </div>
+          <div class="profile-hood">
+            <span class="profile-hood-dot" style="background:#00B894;"></span>
+            <span>Tech Connect</span>
+          </div>
+          <div class="profile-hood">
+            <span class="profile-hood-dot" style="background:#E17055;"></span>
+            <span>Music Heads</span>
+          </div>
+          <div class="profile-hood">
+            <span class="profile-hood-dot" style="background:#FDCB6E;"></span>
+            <span>Foodies Naija</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="section">
+        <div class="section-header">
+          <h3>Settings</h3>
+        </div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <span>Edit Profile</span>
+            <span class="settings-arrow">→</span>
+          </div>
+          <div class="settings-item">
+            <span>Notifications</span>
+            <span class="settings-arrow">→</span>
+          </div>
+          <div class="settings-item">
+            <span>Privacy</span>
+            <span class="settings-arrow">→</span>
+          </div>
+          <div class="settings-item">
+            <span>Appearance</span>
+            <span class="settings-arrow">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav id="bottom-nav">
+    <div class="nav-item active" data-page="home" onclick="navigateTo('home')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item" data-page="chats" onclick="navigateTo('chats')">
+      <span class="nav-icon">💬</span>
+      <span class="nav-label">Chats</span>
+    </div>
+    <div class="nav-item" data-page="hoods" onclick="navigateTo('hoods')">
+      <span class="nav-icon">◆</span>
+      <span class="nav-label">Hoods</span>
+    </div>
+    <div class="nav-item" data-page="gbedu" onclick="navigateTo('gbedu')">
+      <span class="nav-icon">🎵</span>
+      <span class="nav-label">Gbedu</span>
+    </div>
+    <div class="nav-item" data-page="profile" onclick="navigateTo('profile')">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">Profile</span>
+    </div>
+  </nav>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

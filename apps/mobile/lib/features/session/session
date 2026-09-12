@@ -1,0 +1,147 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/core/backend/supabase_client.dart';
+import 'package:mobile/core/models/user.dart';
+import 'package:mobile/core/storage/local_storage_service.dart';
+import 'package:mobile/features/auth/repository/auth_repository.dart';
+
+enum AuthStatus {
+  initial,
+  authenticated,
+  unauthenticated,
+  loading,
+}
+
+class SessionNotifier extends StateNotifier<AsyncValue<User?>> {
+  final LocalStorageService _localStorageService;
+  final AuthRepository _authRepository;
+
+  SessionNotifier(this._localStorageService, this._authRepository)
+      : super(const AsyncValue.data(null)) {
+    initSession();
+    _subscribeToAuthChanges();
+  }
+
+  /// Subscribes to Supabase auth state changes when initialized.
+  void _subscribeToAuthChanges() {
+    if (!SupabaseClientProvider.isInitialized) return;
+
+    SupabaseClientProvider.client!.auth.onAuthStateChange((data, session) {
+      // Update the session state whenever Supabase auth changes.
+      if (session != null) {
+        // Session active — refresh user from repository.
+        _authRepository.getCurrentUser().then((user) {
+          if (user != null) {
+            state = AsyncValue.data(user);
+          }
+        });
+      } else {
+        // Signed out.
+        _localStorageService.clearUser().then((_) {
+          state = const AsyncValue.data(null);
+        });
+      }
+    });
+  }
+
+  Future<void> initSession() async {
+    state = const AsyncValue.loading();
+
+    try {
+      final isLoggedIn = await _localStorageService.isLoggedIn();
+
+      if (!isLoggedIn && !SupabaseClientProvider.isInitialized) {
+        state = const AsyncValue.data(null);
+        return;
+      }
+
+      final user = await _authRepository.getCurrentUser();
+      state = AsyncValue.data(user);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> register({
+    required String fullName,
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final user = await _authRepository.register(
+        fullName: fullName,
+        username: username,
+        email: email,
+        password: password,
+      );
+
+      if (user != null) {
+        state = AsyncValue.data(user);
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> login({
+    required String email,
+    required String password,
+  }) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final user = await _authRepository.login(
+        email: email,
+        password: password,
+      );
+
+      if (user != null) {
+        state = AsyncValue.data(user);
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> logout() async {
+    state = const AsyncValue.loading();
+
+    try {
+      await _authRepository.logout();
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+}
+
+final localStorageServiceProvider = Provider<LocalStorageService>((ref) {
+  return LocalStorageService();
+});
+
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  return AuthRepository(localStorageService);
+});
+
+final sessionProvider = StateNotifierProvider<SessionNotifier, AsyncValue<User?>>((ref) {
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  final authRepository = ref.watch(authRepositoryProvider);
+  return SessionNotifier(localStorageService, authRepository);
+});
+
+final currentUserProvider = Provider<User?>((ref) {
+  final sessionState = ref.watch(sessionProvider);
+  return sessionState.value;
+});
+
+final isAuthenticatedProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user != null;
+});

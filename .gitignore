@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Flutter
+.dart_tool/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env

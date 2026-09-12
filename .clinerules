@@ -1,0 +1,113 @@
+# ORA — Project Rules
+
+## Project Identity
+
+ORA is a social media platform being developed by ORACOOL.
+
+ORA combines modern messaging and social networking with light gamification and Nigerian-inspired terminology.
+
+The product must feel clean, simple, modern, fast, and polished.
+
+Do not make ORA overly flashy, cluttered, or game-like.
+
+## Core Product Concepts
+
+Aura
+- Aura is ORA's primary global reputation/progression score.
+- Aura must remain the main score in the application.
+- Do not create competing scores such as Shared Aura or Friendship Aura.
+
+Steeze
+- Steeze Level represents the user's progression/level.
+- Keep it separate from Aura.
+
+Hood
+- Hood is ORA's terminology for groups/communities.
+
+Gbedu
+- Gbedu is ORA's terminology for the music/entertainment section.
+
+## Product Philosophy
+
+ORA should prioritize:
+- Messaging
+- Friendships
+- Communities
+- Entertainment
+- Personal identity
+- Light competition through Aura and Steeze
+
+Gamification should enhance the social experience, not overwhelm it.
+
+## Design Philosophy
+
+The interface must be:
+- Clean
+- Minimal
+- Modern
+- Responsive
+- Easy to understand
+- Fast to navigate
+
+Avoid:
+- Excessive animations
+- Excessive gradients
+- Excessive glowing effects
+- Clutter
+- Unnecessary cards
+- Unnecessary badges
+- Unnecessary statistics
+- Feature overload
+
+Use whitespace and clear hierarchy.
+
+## Development Rules
+
+1. Do not invent major features without approval.
+2. Do not remove agreed features without approval.
+3. Do not create competing versions of existing concepts.
+4. Do not rewrite working code unnecessarily.
+5. Do not change the project's architecture without explaining why first.
+6. Prefer simple solutions over complicated ones.
+7. Reuse components instead of duplicating code.
+8. Keep code modular and maintainable.
+9. Do not add dependencies unless they are actually needed.
+10. Do not perform unrelated refactoring while implementing a feature.
+11. Work incrementally.
+12. Test changes before declaring a task complete.
+13. If something is unclear, inspect the existing project before making assumptions.
+14. Never overwrite existing work simply to make implementation easier.
+15. Keep the project in a state where development can resume easily after interruptions.
+
+## AI Behavior
+
+Cline must act as an implementation agent.
+
+Before making significant changes:
+- Inspect the relevant existing files.
+- Understand the current structure.
+- Make the smallest reasonable change.
+
+Do not:
+- Start over from scratch without permission.
+- Create duplicate projects.
+- Create unnecessary documentation.
+- Install unnecessary software.
+- Add unnecessary dependencies.
+- Spend time optimizing things that are not currently a problem.
+
+When a task is complete:
+- Explain what was changed briefly.
+- Mention any files created or modified.
+- Report whether the relevant test/build succeeded.
+- Stop and wait for the next task.
+
+## Important
+
+The user is prioritizing development speed.
+
+Do not slow development with unnecessary recommendations.
+
+If a decision is not important to the current task, make a reasonable simple choice and continue.
+
+If a decision could cause significant rework later, stop and ask the user before proceeding.

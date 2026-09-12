@@ -1,0 +1,628 @@
+import "dart:io";
+import "package:mobile/core/utils/result.dart";
+import "package:mobile/core/backend/repositories/post_repository.dart";
+import "package:mobile/core/backend/supabase_client.dart";
+import "package:mobile/core/models/comment.dart";
+import "package:mobile/core/models/post.dart";
+import "package:mobile/core/utils/logger.dart";
+import "package:supabase_flutter/supabase_flutter.dart";
+
+class PostRepositoryImpl implements PostRepository {
+  /// Loads posts from Supabase with author profile information.
+  /// Returns newest posts first.
+  @override
+  Future<Result<List<Post>>> loadPosts(String userId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(<Post>[]);
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      // Query posts with joined author profile data
+      final response = await client
+          .from('posts')
+          .select('''
+            *,
+            profiles!posts_user_id_fkey (
+              user_id,
+              username,
+              display_name,
+              avatar,
+              aura_points
+            )
+          ''')
+          .order('created_at', ascending: false);
+
+      final posts = response.map((post) {
+        final profile = post['profiles'] as Map<String, dynamic>?;
+        
+        return Post(
+          id: post['id'] as String,
+          userId: post['user_id'] as String,
+          username: profile?['username'] as String? ?? 'user',
+          displayName: profile?['display_name'] as String?,
+          avatarUrl: profile?['avatar'] as String?,
+          content: post['content'] as String? ?? '',
+          mediaUrls: post['media_urls'] != null 
+              ? List<String>.from(post['media_urls'] as List)
+              : <String>[],
+          likes: post['likes_count'] as int? ?? 0,
+          comments: post['comments_count'] as int? ?? 0,
+          shares: post['shares_count'] as int? ?? 0,
+          createdAt: DateTime.tryParse(post['created_at'] as String? ?? '') ?? DateTime.now(),
+          updatedAt: post['updated_at'] != null 
+              ? DateTime.tryParse(post['updated_at'] as String? ?? '') 
+              : null,
+        );
+      }).toList();
+
+      return Result.success(posts);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to load posts from Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.success(<Post>[]);
+    }
+  }
+
+  /// Creates a new post in Supabase.
+  @override
+  Future<Result<Post>> createPost(Post post) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      await client.from('posts').insert({
+        'user_id': post.userId,
+        'content': post.content,
+        'media_urls': post.mediaUrls,
+        'likes_count': post.likes,
+        'comments_count': post.comments,
+        'shares_count': post.shares,
+        'created_at': post.createdAt.toIso8601String(),
+        'updated_at': post.updatedAt?.toIso8601String(),
+      });
+
+      return Result.success(post);    } catch (e, stack) {
+      Logger.error(
+        'Failed to create post in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to create post: $e'));
+    }
+  }
+
+  /// Updates an existing post in Supabase.
+  @override
+  Future<Result<Post>> updatePost(Post post) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      final response = await client.from('posts').update({
+        'content': post.content,
+        'media_urls': post.mediaUrls,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', post.id).select('''
+        *,
+        profiles!posts_user_id_fkey (
+          user_id,
+          username,
+          display_name,
+          avatar,
+          aura_points
+        )
+      ''').single();
+
+      final profile = response['profiles'] as Map<String, dynamic>?;
+      
+      final updatedPost = Post(
+        id: response['id'] as String,
+        userId: response['user_id'] as String,
+        username: profile?['username'] as String? ?? post.username,
+        displayName: profile?['display_name'] as String?,
+        avatarUrl: profile?['avatar'] as String?,
+        content: response['content'] as String? ?? post.content,
+        mediaUrls: response['media_urls'] != null 
+            ? List<String>.from(response['media_urls'] as List)
+            : post.mediaUrls,
+        likes: response['likes_count'] as int? ?? post.likes,
+        comments: response['comments_count'] as int? ?? post.comments,
+        shares: response['shares_count'] as int? ?? post.shares,
+        createdAt: DateTime.tryParse(response['created_at'] as String? ?? '') ?? post.createdAt,
+        updatedAt: response['updated_at'] != null 
+            ? DateTime.tryParse(response['updated_at'] as String? ?? '') 
+            : null,
+      );
+
+      return Result.success(updatedPost);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to update post in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to update post: $e'));
+    }
+  }
+
+  /// Deletes a post from Supabase.
+  @override
+  Future<Result<void>> deletePost(String postId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      await client.from('posts').delete().eq('id', postId);
+      return Result.success(null);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to delete post from Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to delete post: $e'));
+    }
+  }
+
+  /// Toggles a like on a post in the post_likes table.
+  /// Prevents duplicate likes with unique constraint.
+  @override
+  Future<Result<LikeToggleResult>> toggleLike(String postId, String userId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+
+      // Check if user already liked the post
+      final existingLike = await client
+          .from('post_likes')
+          .select()
+          .eq('post_id', postId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existingLike != null) {
+        // Unlike - remove the like
+        await client
+            .from('post_likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', userId);
+
+        return Result.success(const LikeToggleResult(isLiked: false, likes: 0));
+      } else {
+        // Like - add the like
+        await client.from('post_likes').insert({
+          'post_id': postId,
+          'user_id': userId,
+        });
+
+        return Result.success(const LikeToggleResult(isLiked: true, likes: 1));
+      }
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to toggle like in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to toggle like: $e'));
+    }
+  }
+
+  /// Legacy like method - delegates to toggleLike.
+  @override
+  Future<Result<void>> likePost(String postId, String userId) async {
+    await toggleLike(postId, userId);
+    return Result.success(null);
+  }
+
+  /// Legacy unlike method - delegates to toggleLike.
+  @override
+  Future<Result<void>> unlikePost(String postId, String userId) async {
+    await toggleLike(postId, userId);
+    return Result.success(null);
+  }
+
+  /// Creates a new comment in the comments table.
+  @override
+  Future<Result<Comment>> createComment(Comment comment) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      final response = await client.from('comments').insert({
+        'id': comment.id,
+        'post_id': comment.postId,
+        'user_id': comment.userId,
+        'parent_id': comment.parentId,
+        'content': comment.content,
+        'is_edited': comment.isEdited,
+        'is_deleted': comment.isDeleted,
+        'created_at': comment.createdAt.toIso8601String(),
+        'updated_at': comment.updatedAt?.toIso8601String(),
+      }).select('''
+        *,
+        profiles!comments_user_id_fkey (
+          user_id,
+          username,
+          display_name,
+          avatar
+        )
+      ''').single();
+
+      final profile = response['profiles'] as Map<String, dynamic>?;
+      
+      final createdComment = Comment(
+        id: response['id'] as String,
+        postId: response['post_id'] as String,
+        userId: response['user_id'] as String,
+        parentId: response['parent_id'] as String?,
+        content: response['content'] as String? ?? comment.content,
+        username: profile?['username'] as String? ?? comment.username,
+        displayName: profile?['display_name'] as String?,
+        avatarUrl: profile?['avatar'] as String?,
+        likesCount: response['likes_count'] as int? ?? 0,
+        isEdited: response['is_edited'] as bool? ?? false,
+        isDeleted: response['is_deleted'] as bool? ?? false,
+        createdAt: DateTime.tryParse(response['created_at'] as String? ?? '') ?? comment.createdAt,
+        updatedAt: response['updated_at'] != null 
+            ? DateTime.tryParse(response['updated_at'] as String? ?? '') 
+            : null,
+      );
+
+      return Result.success(createdComment);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to create comment in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to create comment: $e'));
+    }
+  }
+
+  /// Edits an existing comment in Supabase.
+  @override
+  Future<Result<Comment>> editComment(Comment comment) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      final response = await client.from('comments').update({
+        'content': comment.content,
+        'is_edited': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', comment.id).select('''
+        *,
+        profiles!comments_user_id_fkey (
+          user_id,
+          username,
+          display_name,
+          avatar
+        )
+      ''').single();
+
+      final profile = response['profiles'] as Map<String, dynamic>?;
+      
+      final updatedComment = Comment(
+        id: response['id'] as String,
+        postId: response['post_id'] as String,
+        userId: response['user_id'] as String,
+        parentId: response['parent_id'] as String?,
+        content: response['content'] as String? ?? comment.content,
+        username: profile?['username'] as String? ?? comment.username,
+        displayName: profile?['display_name'] as String?,
+        avatarUrl: profile?['avatar'] as String?,
+        likesCount: response['likes_count'] as int? ?? comment.likesCount,
+        isEdited: response['is_edited'] as bool? ?? true,
+        isDeleted: response['is_deleted'] as bool? ?? comment.isDeleted,
+        createdAt: DateTime.tryParse(response['created_at'] as String? ?? '') ?? comment.createdAt,
+        updatedAt: response['updated_at'] != null 
+            ? DateTime.tryParse(response['updated_at'] as String? ?? '') 
+            : null,
+      );
+
+      return Result.success(updatedComment);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to edit comment in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to edit comment: $e'));
+    }
+  }
+
+  /// Soft deletes a comment in Supabase.
+  @override
+  Future<Result<void>> deleteComment(String commentId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      // Get the comment first to know which post to decrement
+      final comment = await client
+          .from('comments')
+          .select('post_id')
+          .eq('id', commentId)
+          .single();
+
+      // Soft delete
+      await client.from('comments').update({
+        'is_deleted': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', commentId);
+
+      // Decrement post comment count
+      final postId = comment['post_id'] as String;
+      await client.rpc('decrement_post_comments', params: {'post_id': postId});
+
+      return Result.success(null);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to delete comment in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to delete comment: $e'));
+    }
+  }
+
+  /// Loads all non-deleted comments for a post, ordered by newest first.
+  @override
+  Future<Result<List<Comment>>> getComments(String postId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.success(<Comment>[]);
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      
+      final response = await client
+          .from('comments')
+          .select('''
+            *,
+            profiles!comments_user_id_fkey (
+              user_id,
+              username,
+              display_name,
+              avatar
+            )
+          ''')
+          .eq('post_id', postId)
+          .eq('is_deleted', false)
+          .order('created_at', ascending: false);
+
+      final comments = response.map((comment) {
+        final profile = comment['profiles'] as Map<String, dynamic>?;
+        
+        return Comment(
+          id: comment['id'] as String,
+          postId: comment['post_id'] as String,
+          userId: comment['user_id'] as String,
+          parentId: comment['parent_id'] as String?,
+          content: comment['content'] as String? ?? '',
+          username: profile?['username'] as String? ?? 'user',
+          displayName: profile?['display_name'] as String?,
+          avatarUrl: profile?['avatar'] as String?,
+          likesCount: comment['likes_count'] as int? ?? 0,
+          isEdited: comment['is_edited'] as bool? ?? false,
+          isDeleted: comment['is_deleted'] as bool? ?? false,
+          createdAt: DateTime.tryParse(comment['created_at'] as String? ?? '') ?? DateTime.now(),
+          updatedAt: comment['updated_at'] != null 
+              ? DateTime.tryParse(comment['updated_at'] as String? ?? '') 
+              : null,
+        );
+      }).toList();
+
+      return Result.success(comments);
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to load comments from Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.success(<Comment>[]);
+    }
+  }
+
+  /// Toggles a like on a comment.
+  @override
+  Future<Result<LikeToggleResult>> toggleCommentLike(String commentId, String userId) async {
+    if (!SupabaseClientProvider.isInitialized) {
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+
+      // Check if user already liked the comment
+      final existingLike = await client
+          .from('comment_likes')
+          .select()
+          .eq('comment_id', commentId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existingLike != null) {
+        // Unlike
+        await client
+            .from('comment_likes')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('user_id', userId);
+
+        return Result.success(const LikeToggleResult(isLiked: false, likes: 0));
+      } else {
+        // Like
+        await client.from('comment_likes').insert({
+          'comment_id': commentId,
+          'user_id': userId,
+        });
+
+        return Result.success(const LikeToggleResult(isLiked: true, likes: 1));
+      }
+    } catch (e, stack) {
+      Logger.error(
+        'Failed to toggle comment like in Supabase.',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+      return Result.failure(Failure('Failed to toggle comment like: $e'));
+    }
+  }
+
+  /// Uploads an image to the Supabase Storage 'posts' bucket.
+  /// Returns the public URL of the uploaded image.
+  ///
+  /// Logs every stage of the upload pipeline:
+  /// - bucket name
+  /// - file path
+  /// - generated storage path
+  /// - upload response
+  /// - public URL
+  /// - exact exception and stack trace on failure
+  @override
+  Future<Result<String>> uploadImage(String userId, String filePath) async {
+    const bucketName = 'posts';
+
+    if (!SupabaseClientProvider.isInitialized) {
+      Logger.error(
+        'Supabase not initialized.',
+        tag: 'PostRepository',
+      );
+      return Result.failure(const Failure('Supabase not initialized'));
+    }
+
+    try {
+      final client = SupabaseClientProvider.client!;
+      final authUser = client.auth.currentUser;
+
+      Logger.info(
+        '========== STORAGE DEBUG ==========\n'
+        'Authenticated User: ${authUser?.id}\n'
+        'Method userId: $userId\n'
+        'Bucket: $bucketName\n'
+        'File: $filePath',
+        tag: 'PostRepository',
+      );
+
+      if (authUser == null) {
+        return Result.failure(
+          const Failure('No authenticated user found.'),
+        );
+      }
+
+      final file = File(filePath);
+
+      if (!await file.exists()) {
+        return Result.failure(
+          Failure('Image file not found: $filePath'),
+        );
+      }
+
+      final bytes = await file.readAsBytes();
+
+      final extension = file.path.split('.').last.toLowerCase();
+      final storagePath =
+          '${authUser.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+      Logger.info(
+        'Uploading to: $storagePath',
+        tag: 'PostRepository',
+      );
+
+      await client.storage.from(bucketName).uploadBinary(
+        storagePath,
+        bytes,
+        fileOptions: FileOptions(
+          upsert: false,
+          contentType: extension == 'png'
+              ? 'image/png'
+              : extension == 'webp'
+                  ? 'image/webp'
+                  : 'image/jpeg',
+        ),
+      );
+
+      Logger.info(
+        'Upload successful.',
+        tag: 'PostRepository',
+      );
+
+      final publicUrl =
+          client.storage.from(bucketName).getPublicUrl(storagePath);
+
+      Logger.info(
+        'Public URL: $publicUrl',
+        tag: 'PostRepository',
+      );
+
+      return Result.success(publicUrl);
+    } on StorageException catch (e, stack) {
+      Logger.error(
+        '===== STORAGE EXCEPTION =====',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+
+      return Result.failure(
+        Failure(
+          e.message,
+          error: e,
+          stackTrace: stack,
+        ),
+      );
+    } catch (e, stack) {
+      Logger.error(
+        '===== UNKNOWN UPLOAD ERROR =====',
+        error: e,
+        stackTrace: stack,
+        tag: 'PostRepository',
+      );
+
+      return Result.failure(
+        Failure(
+          e.toString(),
+          error: e,
+          stackTrace: stack,
+        ),
+      );
+    }
+  }
+}
