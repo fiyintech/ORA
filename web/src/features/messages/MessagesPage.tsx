@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Search, Send, Smile, Square, Trash2, UserPlus, Video, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Search, Send, Smile, Square, Trash2, UserPlus, Video, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -147,6 +147,9 @@ export default function MessagesPage() {
   const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
   const emojiPanelRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const chatBodyRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const conversationsRef = useRef<ConversationWithDetails[]>([]);
 
   function navigateToSearch() { navigate("/search"); }
@@ -283,7 +286,37 @@ export default function MessagesPage() {
       setMessages((current) => current.map((m) => (m.id === updated.id ? updated : m)));
     });
   }, [selectedId]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const handleChatScroll = () => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+
+    const atBottom = distanceFromBottom <= 48;
+
+    stickToBottomRef.current = atBottom;
+    setShowJumpToLatest(!atBottom);
+  };
+
+  const jumpToLatest = () => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+
+    stickToBottomRef.current = true;
+    setShowJumpToLatest(false);
+
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    if (stickToBottomRef.current) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
   useEffect(() => { void refreshVoiceAllowance(); }, [premiumActive]);
 
   async function refreshVoiceAllowance(): Promise<number | null> {
@@ -545,13 +578,28 @@ export default function MessagesPage() {
         </div>
       </aside>
 
-      <section className={`ora-chat-window min-w-0 flex-1 flex-col ${mobileChatOpen ? "flex" : "hidden md:flex"}`}>
+      <section className={`ora-chat-window relative min-w-0 flex-1 flex-col ${mobileChatOpen ? "flex" : "hidden md:flex"}`}>
         {!selectedConversation ? <div className="flex h-full flex-col items-center justify-center text-center"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600/10 text-violet-400"><MessageCircle size={28} /></div><h2 className="mt-4 text-lg font-semibold">Your messages</h2><p className="mt-1 max-w-xs text-sm text-zinc-600">Select a chat to start talking.</p></div> : <>
           <header className="ora-chat-header flex h-[64px] shrink-0 items-center gap-3 border-b px-3 sm:px-4"><button type="button" onClick={() => setMobileChatOpen(false)} className="icon-button md:hidden" aria-label="Back to chats"><ArrowLeft size={20} /></button><Avatar profile={otherProfile} /><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold text-white">{otherProfile?.display_name || "ORA user"}</h2><p className="truncate text-xs text-zinc-600">{otherProfile ? `@${otherProfile.username}` : "Conversation"}</p></div></header>
           {error && <div className="mx-3 mt-2 rounded-lg bg-red-950/30 px-3 py-2 text-xs text-red-400 sm:mx-4">{error}</div>}
-          <div className="ora-chat-body min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5">
+          <div
+            ref={chatBodyRef}
+            onScroll={handleChatScroll}
+            className="ora-chat-body min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"
+          >
             {loadingMessages ? <div className="flex h-full items-center justify-center text-xs text-zinc-600"><Loader2 size={18} className="mr-2 animate-spin" />Loading messages...</div> : messages.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><Avatar profile={otherProfile} /><h3 className="mt-3 text-sm font-semibold text-zinc-300">Start a conversation</h3><p className="mt-1 text-xs text-zinc-600">Say hello to {otherProfile?.display_name || "this person"}.</p></div> : <div className="mx-auto flex w-full max-w-3xl flex-col gap-1.5">{messages.map((message) => { const own = message.sender_id === currentUserId; const deleted = Boolean(message.deleted_at); return <div key={message.id} className={`ora-message-row group flex ${own ? "justify-end" : "justify-start"}`} onContextMenu={(event) => { if (deleted) return; event.preventDefault(); setMenuId(message.id); }}><div className={`relative flex max-w-[82%] flex-col ${own ? "items-end" : "items-start"}`}><div className={`ora-bubble text-sm ${deleted ? "border border-zinc-800 bg-zinc-900/70 italic text-zinc-600" : own ? "ora-bubble-out" : "ora-bubble-in"}`}>{deleted ? <p className="italic text-zinc-500">This message was deleted</p> : <>{message.media_url && <MediaMessage message={message} own={own} onViewed={markViewed} onExpired={expireViewedMedia} onListened={async (message) => { setMessages((current) => current.filter((m) => m.id !== message.id)); try { await messageService.consumeViewedMedia(message.id, true); } catch (err) { setError(err instanceof Error ? err.message : "Unable to consume voice note."); } }} />}{message.content && <p className={message.media_url ? "mt-2 whitespace-pre-wrap" : "whitespace-pre-wrap"}>{message.content}</p>}</>}</div><div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] text-zinc-600 ${own ? "justify-end" : "justify-start"}`}><span>{formatMessageTime(message.created_at)}</span>{own && <span className={message.read_at ? "text-violet-400" : "text-zinc-600"}><BubbleStatus message={message} /></span>} {!deleted && <div className="relative"><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setMenuId((value) => value === message.id ? null : message.id)} className="rounded p-1 text-zinc-600 hover:bg-zinc-900 hover:text-white" aria-label="Message options"><MoreVertical size={13} /></button>{menuId === message.id && <div onMouseDown={(event) => event.stopPropagation()} className="ora-message-menu absolute bottom-7 right-0 z-30 w-48 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950/95 p-1.5 shadow-2xl backdrop-blur"><button type="button" onClick={() => { if (!premiumActive) { setMenuId(null); navigate("/premium"); return; } setForwardingMessage(message); setMenuId(null); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-800" : "ora-premium-locked text-amber-200"}`}><Forward size={15} />{premiumActive ? "Forward" : "Forward · Power Hour"}</button>{message.content ? <button type="button" onClick={() => void copyMessage(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"><Copy size={15} />Copy</button> : null}<div className="my-1 border-t border-zinc-800" />{own ? <><button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-300 hover:bg-zinc-800"><Trash2 size={15} />Delete for me</button><button type="button" onClick={() => void deleteForEveryone(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for everyone</button></> : <button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for me</button>}</div>}</div>}</div></div></div>; })}<div ref={endRef} /></div>}
           </div>
+          {showJumpToLatest ? (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className="absolute bottom-20 left-1/2 z-20 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-zinc-900/80 text-zinc-200 shadow-lg backdrop-blur-md transition hover:bg-zinc-800/90 hover:text-white"
+              aria-label="Jump to latest message"
+              title="Jump to latest message"
+            >
+              <ArrowDown size={18} />
+            </button>
+          ) : null}
           <div className="ora-composer shrink-0 border-t px-3 py-2.5 sm:px-4">
             {recording && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200">Recording voice note · {recordingSeconds}s{!premiumActive ? ` / ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s remaining today` : ""} · tap the stop button when finished</div>}
             {attachments.length > 0 && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
