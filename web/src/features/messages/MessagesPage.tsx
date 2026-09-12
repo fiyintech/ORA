@@ -26,14 +26,6 @@ function formatListTime(timestamp?: string | null) {
 }
 function formatMessageTime(timestamp: string) { return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function BubbleStatus({ message }: { message: Message }) { return message.deleted_at ? null : message.read_at ? <CheckCheck size={13} /> : <Check size={13} />; }
-function videoMime(url: string) {
-  if (/\.webm(?:$|\?)/i.test(url)) return "video/webm";
-  if (/\.(mov|qt)(?:$|\?)/i.test(url)) return "video/quicktime";
-  if (/\.(m4v)(?:$|\?)/i.test(url)) return "video/x-m4v";
-  if (/\.(ogg|ogv)(?:$|\?)/i.test(url)) return "video/ogg";
-  if (/\.(mpeg|mpg)(?:$|\?)/i.test(url)) return "video/mpeg";
-  return "video/mp4";
-}
 
 function MediaMessage({ message, own, onViewed, onExpired, onListened }: { message: Message; own: boolean; onViewed: (message: Message) => Promise<Message | null>; onExpired: (message: Message) => Promise<void>; onListened: (message: Message) => Promise<void> }) {
   const [mediaFailed, setMediaFailed] = useState(false);
@@ -105,7 +97,7 @@ function MediaMessage({ message, own, onViewed, onExpired, onListened }: { messa
   return <>
     <button type="button" onClick={() => void openViewer()} className={`ora-chat-media group relative block max-w-full overflow-hidden rounded-xl text-left ${!own && !message.media_viewed_at ? "is-unviewed" : ""}`} aria-label={`Open ${mediaType} full screen`}>
       {mediaType === "video" ? (
-        <div className="relative"><video muted playsInline preload="metadata" onError={() => setMediaFailed(true)} className="pointer-events-none max-h-[340px] w-full object-contain transition duration-300"><source src={message.media_url} type={videoMime(message.media_url)} /></video>
+        <div className="relative"><video src={message.media_url} muted playsInline preload="metadata" onLoadedMetadata={() => setMediaFailed(false)} onError={() => setMediaFailed(true)} className="pointer-events-none max-h-[340px] w-full object-contain transition duration-300" />
           {!own && !message.media_viewed_at ? <span className="ora-media-lock pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-amber-100"><span className="text-sm">◉</span> Tap to view</span> : null}
           <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">{!own && !message.media_viewed_at ? "Tap to reveal and start the timer" : "Tap to view full screen"}</span>
         </div>
@@ -133,7 +125,7 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingDurationMs, setRecordingDurationMs] = useState(0);
@@ -152,6 +144,8 @@ export default function MessagesPage() {
   const [composerPanel, setComposerPanel] = useState<"emoji" | null>(null);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
+  const emojiPanelRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const conversationsRef = useRef<ConversationWithDetails[]>([]);
 
@@ -304,24 +298,60 @@ export default function MessagesPage() {
     return remaining;
   }
 
-  const chooseAttachment = (file?: File) => {
-    if (!file) return;
-    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const imageExtensions = new Set(["jpg","jpeg","png","webp","gif","avif","bmp"]);
-    const videoExtensions = new Set(["mp4","webm","mov","m4v","mpeg","mpg","ogg"]);
-    const isImage = file.type.startsWith("image/") || (!file.type && imageExtensions.has(extension));
-    const audioExtensions = new Set(["webm","ogg","mp3","m4a","wav"]);
-    const isVideo = file.type.startsWith("video/") || (!file.type && videoExtensions.has(extension));
-    const isAudio = file.type.startsWith("audio/") || (!file.type && audioExtensions.has(extension));
-    if (!isImage && !isVideo && !isAudio) { setError("Choose an image, video, or audio file."); return; }
-    if (isVideo && !premiumActive) { navigate("/premium"); return; }
-    if (isAudio && !premiumActive) { setError("Voice notes are available on Standard within your daily allowance."); return; }
-    const max = premiumActive ? 50 * 1024 * 1024 : 6 * 1024 * 1024;
-    if (file.size > max) {
-      setError(`${isImage ? "Images" : "Videos"} must be ${premiumActive ? 50 : 6} MB or smaller.`);
+  const chooseAttachments = (files?: FileList | File[]) => {
+    if (!files) return;
+    const selected = Array.from(files);
+    if (!selected.length) return;
+
+    const extensionOf = (file: File) => file.name.split(".").pop()?.toLowerCase() ?? "";
+    const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp"]);
+    const videoExtensions = new Set(["mp4", "webm", "mov", "m4v", "mpeg", "mpg", "ogg"]);
+    const audioExtensions = new Set(["webm", "ogg", "mp3", "m4a", "wav"]);
+
+    const classify = (file: File) => {
+      const extension = extensionOf(file);
+      const isImage = file.type.startsWith("image/") || (!file.type && imageExtensions.has(extension));
+      const isVideo = file.type.startsWith("video/") || (!file.type && videoExtensions.has(extension));
+      const isAudio = file.type.startsWith("audio/") || (!file.type && audioExtensions.has(extension));
+      return { isImage, isVideo, isAudio };
+    };
+
+    const kinds = selected.map(classify);
+    if (selected.length > 1 && (!premiumActive || kinds.some(({ isImage, isVideo, isAudio }) => !isImage || isVideo || isAudio))) {
+      setError("Multiple image uploads are a Power Hour feature. Select images only.");
       return;
     }
-    setError(""); setAttachment(file);
+
+    const invalid = kinds.findIndex(({ isImage, isVideo, isAudio }) => !isImage && !isVideo && !isAudio);
+    if (invalid !== -1) {
+      setError("Choose an image, video, or audio file.");
+      return;
+    }
+
+    const maxBytes = premiumActive ? 50 * 1024 * 1024 : 6 * 1024 * 1024;
+    for (let index = 0; index < selected.length; index += 1) {
+      const file = selected[index];
+      const { isImage, isVideo, isAudio } = kinds[index];
+      if (isVideo && !premiumActive) {
+        navigate("/premium");
+        return;
+      }
+      if (isAudio && !premiumActive) {
+        setError("Voice notes are available on Standard within your daily allowance.");
+        return;
+      }
+      if (file.size > maxBytes) {
+        setError(`${isImage ? "Images" : isVideo ? "Videos" : "Voice notes"} must be ${premiumActive ? 50 : 6} MB or smaller.`);
+        return;
+      }
+    }
+
+    setError("");
+    setAttachments(selected);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   function clearRecordingTimer() {
@@ -367,7 +397,7 @@ export default function MessagesPage() {
         const blob = new Blob(recordingChunksRef.current, { type: mime });
         const extension = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
         if (blob.size > 50 * 1024 * 1024) { setError("Voice note is too large. Keep it under 50 MB."); }
-        else { setAttachment(new File([blob], `voice-note.${extension}`, { type: mime })); setError(""); }
+        else { setAttachments([new File([blob], `voice-note.${extension}`, { type: mime })]); setError(""); }
         setRecording(false);
         mediaRecorderRef.current = null;
         recordingChunksRef.current = [];
@@ -386,18 +416,57 @@ export default function MessagesPage() {
     }
   }
   async function sendMessage() {
-    if (!selectedId || sending || (!text.trim() && !attachment)) return;
-    const body = text.trim(); const file = attachment; setSending(true); setError(""); setText(""); setAttachment(null);
+    if (!selectedId || sending || (!text.trim() && attachments.length === 0)) return;
+    const body = text.trim();
+    const files = [...attachments];
+    setSending(true);
+    setError("");
+    setText("");
+    setAttachments([]);
+    let sentCount = 0;
+
     try {
-      const sent = await messageService.sendMessage(selectedId, body, file ? { file, type: file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "image", durationMs: file.type.startsWith("audio/") ? (recordingDurationMsRef.current || recordingDurationMs) : undefined } : undefined);
-      setMessages((current) => {
-        const exists = current.some((m) => m.id === sent.id);
-        return exists ? current.map((m) => (m.id === sent.id ? sent : m)) : [...current, sent];
-      });
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const isVideo = file.type.startsWith("video/");
+        const isAudio = file.type.startsWith("audio/");
+        const sent = await messageService.sendMessage(
+          selectedId,
+          index === 0 ? body : "",
+          {
+            file,
+            type: isVideo ? "video" : isAudio ? "audio" : "image",
+            durationMs: isAudio ? (recordingDurationMsRef.current || recordingDurationMs) : undefined,
+          },
+        );
+        sentCount += 1;
+        setMessages((current) => {
+          const exists = current.some((m) => m.id === sent.id);
+          return exists ? current.map((m) => (m.id === sent.id ? sent : m)) : [...current, sent];
+        });
+      }
+
+      if (files.length === 0) {
+        const sent = await messageService.sendMessage(selectedId, body);
+        sentCount = 1;
+        setMessages((current) => {
+          const exists = current.some((m) => m.id === sent.id);
+          return exists ? current.map((m) => (m.id === sent.id ? sent : m)) : [...current, sent];
+        });
+      }
+
       await refreshVoiceAllowance();
-      const refreshed = await messageService.getConversations(); setConversations(refreshed); if (currentUserId) setCache(`conversations:${currentUserId}`, refreshed); await loadProfiles(refreshed);
-    } catch (err) { setText(body); setAttachment(file); setError(err instanceof Error ? err.message : "Unable to send message."); }
-    finally { setSending(false); }
+      const refreshed = await messageService.getConversations();
+      setConversations(refreshed);
+      if (currentUserId) setCache(`conversations:${currentUserId}`, refreshed);
+      await loadProfiles(refreshed);
+    } catch (err) {
+      setText(body);
+      setAttachments(files.slice(sentCount));
+      setError(err instanceof Error ? err.message : "Unable to send message.");
+    } finally {
+      setSending(false);
+    }
   }
   async function deleteForMe(message: Message) {
     try {
@@ -440,6 +509,16 @@ export default function MessagesPage() {
     try { await messageService.consumeViewedMedia(message.id); } catch (err) { console.error("Unable to consume viewed chat media", err); }
   }, []);
   function profileForConversation(c: ConversationWithDetails) { if (!currentUserId) return null; const other = c.members.find((m) => m.user_id !== currentUserId); return other ? profiles[other.user_id] ?? null : null; }
+  useEffect(() => {
+    if (!composerPanel) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (emojiPanelRef.current?.contains(target) || emojiButtonRef.current?.contains(target)) return;
+      setComposerPanel(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [composerPanel]);
   const emojiCategories = {
     "Smileys & emotion": ["😀","😃","😄","😁","😆","😅","😂","🤣","🥲","☺️","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🫣","🤗","🤔","🫡","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","☠️","👽","👾","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾"],
     "People & body": ["👋","🤚","🖐️","✋","🖖","👌","🤌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦵","🦶","👂","👃","🧠","🫀","🫁","🦷","🦴","👀","👁️","👅","👄","💋","🫦","👶","🧒","👦","👧","🧑","👱","👨","👩","🧔","👵","👴","🧓","🙍","🙎","🙅","🙆","💁","🙋","🧏","🙇","🤦","🤷","👮","🕵️","💂","🥷","👷","🤴","👸","👳","👲","🧕","🤵","👰","🤰","🫃","🫄","🧘","🧍","🧎","🚶","🏃","💃","🕺","🕴️","👯","🗣️","👤","👥"],
@@ -474,8 +553,20 @@ export default function MessagesPage() {
             {loadingMessages ? <div className="flex h-full items-center justify-center text-xs text-zinc-600"><Loader2 size={18} className="mr-2 animate-spin" />Loading messages...</div> : messages.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><Avatar profile={otherProfile} /><h3 className="mt-3 text-sm font-semibold text-zinc-300">Start a conversation</h3><p className="mt-1 text-xs text-zinc-600">Say hello to {otherProfile?.display_name || "this person"}.</p></div> : <div className="mx-auto flex w-full max-w-3xl flex-col gap-1.5">{messages.map((message) => { const own = message.sender_id === currentUserId; const deleted = Boolean(message.deleted_at); return <div key={message.id} className={`ora-message-row group flex ${own ? "justify-end" : "justify-start"}`} onContextMenu={(event) => { if (deleted) return; event.preventDefault(); setMenuId(message.id); }}><div className={`relative flex max-w-[82%] flex-col ${own ? "items-end" : "items-start"}`}><div className={`ora-bubble text-sm ${deleted ? "border border-zinc-800 bg-zinc-900/70 italic text-zinc-600" : own ? "ora-bubble-out" : "ora-bubble-in"}`}>{deleted ? <p className="italic text-zinc-500">This message was deleted</p> : <>{message.media_url && <MediaMessage message={message} own={own} onViewed={markViewed} onExpired={expireViewedMedia} onListened={async (message) => { setMessages((current) => current.filter((m) => m.id !== message.id)); try { await messageService.consumeViewedMedia(message.id, true); } catch (err) { setError(err instanceof Error ? err.message : "Unable to consume voice note."); } }} />}{message.content && <p className={message.media_url ? "mt-2 whitespace-pre-wrap" : "whitespace-pre-wrap"}>{message.content}</p>}</>}</div><div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] text-zinc-600 ${own ? "justify-end" : "justify-start"}`}><span>{formatMessageTime(message.created_at)}</span>{own && <span className={message.read_at ? "text-violet-400" : "text-zinc-600"}><BubbleStatus message={message} /></span>} {!deleted && <div className="relative"><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setMenuId((value) => value === message.id ? null : message.id)} className="rounded p-1 text-zinc-600 hover:bg-zinc-900 hover:text-white" aria-label="Message options"><MoreVertical size={13} /></button>{menuId === message.id && <div onMouseDown={(event) => event.stopPropagation()} className="ora-message-menu absolute bottom-7 right-0 z-30 w-48 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950/95 p-1.5 shadow-2xl backdrop-blur"><button type="button" onClick={() => { if (!premiumActive) { setMenuId(null); navigate("/premium"); return; } setForwardingMessage(message); setMenuId(null); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-800" : "ora-premium-locked text-amber-200"}`}><Forward size={15} />{premiumActive ? "Forward" : "Forward · Power Hour"}</button>{message.content ? <button type="button" onClick={() => void copyMessage(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"><Copy size={15} />Copy</button> : null}<div className="my-1 border-t border-zinc-800" />{own ? <><button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-300 hover:bg-zinc-800"><Trash2 size={15} />Delete for me</button><button type="button" onClick={() => void deleteForEveryone(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for everyone</button></> : <button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for me</button>}</div>}</div>}</div></div></div>; })}<div ref={endRef} /></div>}
           </div>
           <div className="ora-composer shrink-0 border-t px-3 py-2.5 sm:px-4">
-            {recording && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200">Recording voice note · {recordingSeconds}s{!premiumActive ? ` / ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s remaining today` : ""} · tap the stop button when finished</div>}{attachment && <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-violet-300">{attachment.type.startsWith("video/") ? <Video size={18} /> : <ImagePlus size={18} />}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-zinc-200">{attachment.name}</p><p className="text-[10px] text-zinc-600">{(attachment.size / 1024 / 1024).toFixed(1)} MB · disappears after it is viewed{attachment.type.startsWith("audio/") ? " · voice note" : premiumActive ? " · Power Hour" : " · Standard"}</p></div><button type="button" onClick={() => setAttachment(null)} className="icon-button" aria-label="Remove attachment"><X size={16} /></button></div>}
-            {composerPanel ? <div className="mx-auto mb-2 max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-zinc-300">Emoji</p><button type="button" onClick={() => setComposerPanel(null)} className="icon-button h-8 w-8" aria-label="Close emoji picker"><X size={15} /></button></div><div className="mb-2 flex gap-1 overflow-x-auto border-b border-zinc-800 pb-2">{emojiCategoryNames.map((category) => <button key={category} type="button" onClick={() => setEmojiCategory(category)} className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${emojiCategory === category ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200"}`}>{category}</button>)}</div><div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto pr-1 sm:grid-cols-12">{emojiCategories[emojiCategory].map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => setText((value) => `${value}${emoji}`)} className="flex h-9 items-center justify-center rounded-lg text-xl hover:bg-zinc-800" aria-label={`Insert ${emoji}`}>{emoji}</button>)}</div></div> : null}<form onSubmit={(e) => { e.preventDefault(); void sendMessage(); }} className="mx-auto flex max-w-3xl items-end gap-1.5"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" hidden onChange={(e) => { chooseAttachment(e.target.files?.[0]); e.currentTarget.value = ""; }} /><input id="ora-video-input" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/mpeg,video/x-m4v" hidden onChange={(e) => { chooseAttachment(e.target.files?.[0]); e.currentTarget.value = ""; }} /><button type="button" onClick={() => setComposerPanel((value) => value === "emoji" ? null : "emoji")} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${composerPanel === "emoji" ? "bg-zinc-800 text-violet-400" : ""}`} aria-label="Emoji" title="Emoji"><Smile size={19} /></button><button type="button" onClick={() => fileRef.current?.click()} disabled={sending || recording} className="icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full" aria-label="Send photo" title="Send photo"><ImagePlus size={19} /></button><button type="button" onClick={() => { if (!premiumActive) { navigate("/premium"); return; } document.getElementById("ora-video-input")?.click(); }} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${!premiumActive ? "ora-premium-locked" : ""}`} aria-label="Send video" title={premiumActive ? "Send video · up to 50 MB" : "Send video · Power Hour required"}><Video size={19} /></button><button type="button" onClick={() => { if (recording) stopRecording(); else if (!premiumActive) void startRecording(); else void startRecording(); }} disabled={sending} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${recording ? "bg-red-600/20 text-red-300" : ""}`} aria-label={recording ? "Stop voice note" : "Record voice note"} title={recording ? `Stop recording · ${recordingSeconds}s` : premiumActive ? "Record voice note" : `Record voice note · ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s left today`}>{recording ? <Square size={17} /> : <Mic size={19} />}</button><div className="min-w-0 flex-1"><textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} rows={1} maxLength={maxMessageLength} disabled={sending} placeholder={attachment ? "Add a caption…" : "Type a message"} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-600" /><div className="mt-1 flex justify-end px-1 text-[10px] text-zinc-600">{text.length}/{maxMessageLength}</div></div><button type="submit" disabled={sending || recording || (!text.trim() && !attachment)} className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">{sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}</button></form>
+            {recording && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2 text-xs text-red-200">Recording voice note · {recordingSeconds}s{!premiumActive ? ` / ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s remaining today` : ""} · tap the stop button when finished</div>}
+            {attachments.length > 0 && <div className="mx-auto mb-2 max-w-3xl rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
+              <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-zinc-200">{attachments.length === 1 ? attachments[0].name : `${attachments.length} images selected`}</p>
+                  <p className="text-[10px] text-zinc-600">{attachments.reduce((total, file) => total + file.size, 0) / 1024 / 1024 < 0.1 ? "Less than 0.1" : (attachments.reduce((total, file) => total + file.size, 0) / 1024 / 1024).toFixed(1)} MB total · {attachments.length === 1 && attachments[0].type.startsWith("audio/") ? "voice note" : attachments.length > 1 ? "Power Hour · sends as separate messages" : attachments[0].type.startsWith("video/") ? "Power Hour video" : premiumActive ? "Power Hour image" : "Standard image"}</p>
+                </div>
+                <button type="button" onClick={() => setAttachments([])} className="icon-button h-8 w-8 shrink-0" aria-label="Remove all attachments"><X size={16} /></button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((file, index) => <button key={`${file.name}-${file.lastModified}-${index}`} type="button" onClick={() => removeAttachment(index)} className="flex max-w-full items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 text-left text-[10px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200" title="Remove this attachment"><span className="shrink-0 text-violet-300">{file.type.startsWith("video/") ? <Video size={13} /> : file.type.startsWith("audio/") ? <Mic size={13} /> : <ImagePlus size={13} />}</span><span className="max-w-[180px] truncate">{file.name}</span><X size={11} className="shrink-0 text-zinc-600" /></button>)}
+              </div>
+            </div>}
+            {composerPanel ? <div ref={emojiPanelRef} className="mx-auto mb-2 max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-zinc-300">Emoji</p><button type="button" onClick={() => setComposerPanel(null)} className="icon-button h-8 w-8" aria-label="Close emoji picker"><X size={15} /></button></div><div className="mb-2 flex gap-1 overflow-x-auto border-b border-zinc-800 pb-2">{emojiCategoryNames.map((category) => <button key={category} type="button" onClick={() => setEmojiCategory(category)} className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${emojiCategory === category ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200"}`}>{category}</button>)}</div><div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto pr-1 sm:grid-cols-12">{emojiCategories[emojiCategory].map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => setText((value) => `${value}${emoji}`)} className="flex h-9 items-center justify-center rounded-lg text-xl hover:bg-zinc-800" aria-label={`Insert ${emoji}`}>{emoji}</button>)}</div></div> : null}<form onSubmit={(e) => { e.preventDefault(); void sendMessage(); }} className="mx-auto flex max-w-3xl items-end gap-1.5"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" multiple={premiumActive} hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><input id="ora-video-input" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/mpeg,video/x-m4v" hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><button ref={emojiButtonRef} type="button" onClick={() => setComposerPanel((value) => value === "emoji" ? null : "emoji")} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${composerPanel === "emoji" ? "bg-zinc-800 text-violet-400" : ""}`} aria-label="Emoji" title="Emoji"><Smile size={19} /></button><button type="button" onClick={() => fileRef.current?.click()} disabled={sending || recording} className="icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full" aria-label="Send photo" title="Send photo"><ImagePlus size={19} /></button><button type="button" onClick={() => { if (!premiumActive) { navigate("/premium"); return; } document.getElementById("ora-video-input")?.click(); }} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${!premiumActive ? "ora-premium-locked" : ""}`} aria-label="Send video" title={premiumActive ? "Send video · up to 50 MB" : "Send video · Power Hour required"}><Video size={19} /></button><button type="button" onClick={() => { if (recording) stopRecording(); else if (!premiumActive) void startRecording(); else void startRecording(); }} disabled={sending} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${recording ? "bg-red-600/20 text-red-300" : ""}`} aria-label={recording ? "Stop voice note" : "Record voice note"} title={recording ? `Stop recording · ${recordingSeconds}s` : premiumActive ? "Record voice note" : `Record voice note · ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s left today`}>{recording ? <Square size={17} /> : <Mic size={19} />}</button><div className="min-w-0 flex-1"><textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} rows={1} maxLength={maxMessageLength} disabled={sending} placeholder={attachments.length > 0 ? "Add a caption…" : "Type a message"} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-600" /><div className="mt-1 flex justify-end px-1 text-[10px] text-zinc-600">{text.length}/{maxMessageLength}</div></div><button type="submit" disabled={sending || recording || (!text.trim() && attachments.length === 0)} className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">{sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}</button></form>
           </div>
         </>}
       </section>

@@ -153,7 +153,7 @@ export default function SearchPage() {
               placeholder="Search by name or username"
               aria-label="Search by name or username"
               autoComplete="off"
-              className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-900 pl-11 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-2 focus:ring-violet-500/20"
+              className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-900 pl-14 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-2 focus:ring-violet-500/20"
             />
             {query && (
               <button
