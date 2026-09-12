@@ -45,6 +45,10 @@ function MediaMessage({ message, own, onViewed, onExpired, onListened }: { messa
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    setMediaFailed(false);
+  }, [message.media_url]);
+
+  useEffect(() => {
     const expiry = localExpiry ?? (viewedMedia?.media_viewed_at ? new Date(new Date(viewedMedia.media_viewed_at).getTime() + 12000).toISOString() : null);
     if (!expiry) return;
     const update = () => setSecondsLeft(Math.max(0, Math.ceil((new Date(expiry).getTime() - Date.now()) / 1000)));
@@ -288,10 +292,16 @@ export default function MessagesPage() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { void refreshVoiceAllowance(); }, [premiumActive]);
 
-  async function refreshVoiceAllowance() {
-    if (premiumActive) { setVoiceRemainingMs(null); return; }
+  async function refreshVoiceAllowance(): Promise<number | null> {
+    if (premiumActive) { setVoiceRemainingMs(null); return null; }
     const { data, error } = await supabase.rpc("get_voice_note_daily_remaining");
-    if (!error) setVoiceRemainingMs(typeof data === "number" ? data : Number(data ?? 0));
+    if (error) {
+      setVoiceRemainingMs(null);
+      return null;
+    }
+    const remaining = Math.max(0, typeof data === "number" ? data : Number(data ?? 0));
+    setVoiceRemainingMs(remaining);
+    return remaining;
   }
 
   const chooseAttachment = (file?: File) => {
@@ -325,7 +335,12 @@ export default function MessagesPage() {
 
   async function startRecording() {
     if (recording || sending) return;
-    if (!premiumActive && voiceRemainingMs !== null && voiceRemainingMs <= 0) { navigate("/premium"); return; }
+    let remainingAtStart = voiceRemainingMs;
+    if (!premiumActive) {
+      if (remainingAtStart === null) remainingAtStart = await refreshVoiceAllowance();
+      if (remainingAtStart === null) { setError("Unable to check your daily voice-note allowance. Please try again."); return; }
+      if (remainingAtStart <= 0) { setError("Your 60-second Standard voice-note allowance has been used for today. It resets tomorrow."); return; }
+    }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setError("Voice notes are not supported by this browser."); return; }
     try {
       setError("");
@@ -359,7 +374,7 @@ export default function MessagesPage() {
         clearRecordingTimer();
       };
       recorder.start(250);
-      const allowanceAtStartMs = premiumActive ? null : Math.max(0, voiceRemainingMs ?? 60000);
+      const allowanceAtStartMs = premiumActive ? null : Math.max(0, remainingAtStart ?? 0);
       recordingTimerRef.current = window.setInterval(() => {
         const elapsedMs = Date.now() - recordingStartedRef.current;
         setRecordingSeconds(Math.floor(elapsedMs / 1000));
@@ -375,7 +390,10 @@ export default function MessagesPage() {
     const body = text.trim(); const file = attachment; setSending(true); setError(""); setText(""); setAttachment(null);
     try {
       const sent = await messageService.sendMessage(selectedId, body, file ? { file, type: file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "image", durationMs: file.type.startsWith("audio/") ? (recordingDurationMsRef.current || recordingDurationMs) : undefined } : undefined);
-      setMessages((current) => current.some((m) => m.id === sent.id) ? current : [...current, sent]);
+      setMessages((current) => {
+        const exists = current.some((m) => m.id === sent.id);
+        return exists ? current.map((m) => (m.id === sent.id ? sent : m)) : [...current, sent];
+      });
       await refreshVoiceAllowance();
       const refreshed = await messageService.getConversations(); setConversations(refreshed); if (currentUserId) setCache(`conversations:${currentUserId}`, refreshed); await loadProfiles(refreshed);
     } catch (err) { setText(body); setAttachment(file); setError(err instanceof Error ? err.message : "Unable to send message."); }

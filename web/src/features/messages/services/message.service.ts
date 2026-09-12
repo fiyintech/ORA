@@ -38,7 +38,7 @@ export interface ConversationWithDetails
 
 class MessageService {
   private mediaMime(file: File, type: "image" | "video" | "audio"): string {
-    if (file.type) return file.type;
+    if (file.type) return file.type.split(";", 1)[0].trim().toLowerCase();
     const extension = file.name.split(".").pop()?.toLowerCase();
     const map: Record<string, string> = {
       jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", avif: "image/avif", bmp: "image/bmp",
@@ -502,13 +502,19 @@ class MessageService {
             ? ["video/mp4", "video/webm", "video/quicktime", "video/ogg", "video/mpeg", "video/x-m4v"]
             : ["audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav"];
         if (!allowed.includes(contentType)) throw new Error(`Unsupported ${media.type} format. Use a common JPG/PNG/WebP/AVIF image, MP4/WebM/MOV video, or WebM/MP4/OGG audio.`);
+
         const standardMaxBytes = 6 * 1024 * 1024;
         const premiumMaxBytes = 50 * 1024 * 1024;
-        const defaultMaxBytes = media.type === "image" ? standardMaxBytes : premiumMaxBytes;
-        const maxBytes = Math.min(options?.maxBytes ?? defaultMaxBytes, premiumActive || media.type === "image" ? premiumMaxBytes : standardMaxBytes);
+        const maxBytes = Math.min(
+          options?.maxBytes ?? (media.type === "image" ? standardMaxBytes : premiumMaxBytes),
+          media.type === "audio" ? (premiumActive ? premiumMaxBytes : standardMaxBytes) :
+            media.type === "video" ? (premiumActive ? premiumMaxBytes : standardMaxBytes) :
+              premiumMaxBytes,
+        );
         if (media.file.size > maxBytes) {
           const maxMb = Math.floor(maxBytes / (1024 * 1024));
-          throw new Error(`${media.type === "image" ? "Images" : "Videos"} must be ${maxMb} MB or smaller.`);
+          const label = media.type === "image" ? "Images" : media.type === "video" ? "Videos" : "Voice notes";
+          throw new Error(`${label} must be ${maxMb} MB or smaller.`);
         }
         const ext = (media.file.name.split(".").pop() || (media.type === "image" ? "jpg" : "mp4")).toLowerCase().replace(/[^a-z0-9]/g, "") || (media.type === "image" ? "jpg" : "mp4");
         uploadedPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
@@ -682,9 +688,7 @@ class MessageService {
             filter: `conversation_id=eq.${conversationId}`,
           },
           (payload) => {
-            onMessage(
-              payload.new as Message,
-            );
+            onMessage(this.withFreshMediaUrl(payload.new as Message));
           },
         )
         .subscribe();
