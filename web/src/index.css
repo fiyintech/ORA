@@ -1,0 +1,619 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #050506;
+  --surface: #0b0b0e;
+  --surface-2: #111116;
+  --surface-3: #18181f;
+  --border: #23232b;
+  --border-soft: #1a1a20;
+  --text: #f5f5f7;
+  --muted: #94949f;
+  --subtle: #676773;
+  --primary: #7c3aed;
+  --primary-hover: #8b5cf6;
+  --success: #22c55e;
+  --danger: #ef4444;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-height: 100vh; }
+html { background: var(--background); }
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Power Hour premium environment: subtle, temporary ambience tied to the server-backed entitlement. */
+:root[data-premium="true"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 15% 15%, rgb(199 164 95 / .055), transparent 24%),
+    radial-gradient(circle at 85% 80%, rgb(116 185 255 / .04), transparent 26%),
+    linear-gradient(120deg, transparent 0 44%, rgb(199 164 95 / .018) 44.5% 45%, transparent 45.5% 100%);
+}
+
+:root[data-premium="true"] .ora-page,
+:root[data-premium="true"] main {
+  position: relative;
+}
+
+button, input, select, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+input, select { min-height: 44px; }
+textarea { line-height: 1.5; }
+img { max-width: 100%; }
+
+::selection { background: rgb(124 58 237 / 0.35); }
+:focus-visible { outline: 2px solid rgb(139 92 246 / 0.85); outline-offset: 2px; }
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a33; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a45; }
+
+/* ORA-wide component normalization. */
+.rounded-2xl { border-radius: 14px !important; }
+.rounded-xl { border-radius: 10px !important; }
+.rounded-lg { border-radius: 8px !important; }
+
+/* Keep the interface dense without making controls cramped. */
+main .border-zinc-900 { border-color: var(--border-soft); }
+main .border-zinc-800 { border-color: var(--border); }
+main .bg-zinc-950 { background-color: var(--surface); }
+main .bg-zinc-900 { background-color: var(--surface-2); }
+
+/* Buttons: consistent height, alignment and hover treatment. */
+button[class*="bg-violet-600"],
+button[class*="bg-violet-500"],
+button[class*="bg-white"] {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  line-height: 1;
+}
+
+/* Text/icon buttons shouldn't inherit accidental browser button chrome. */
+button:not([class*="bg-"]) { border-color: transparent; }
+
+/* Forms across profile/settings/search/auth/hoods. */
+input:not([type="file"]):not([class*="bg-transparent"]),
+select:not([class*="bg-transparent"]),
+textarea:not([class*="bg-transparent"]) {
+  color: var(--text);
+  border-color: var(--border);
+  background-color: var(--surface-2);
+}
+
+input:not([type="file"]):not([class*="bg-transparent"]),
+select:not([class*="bg-transparent"]) {
+  border-radius: 10px;
+  padding: 0 13px;
+}
+
+textarea:not([class*="bg-transparent"]) {
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+input:not([type="file"]):focus, select:focus, textarea:focus {
+  border-color: #6d28d9;
+  box-shadow: 0 0 0 3px rgb(109 40 217 / 0.1);
+}
+
+/* Feed media stays visually controlled even when source images are huge. */
+article img:not([class*="rounded-full"]),
+.ora-post-media img {
+  max-width: 100%;
+}
+
+/* Shared page rhythm. */
+main > .mx-auto { max-width: 100%; }
+
+.ora-topbar { background: rgb(5 5 6 / .92); border-color: var(--border); }
+.ora-topbar input { color: var(--text); border: 0 !important; outline: none !important; box-shadow: none !important; border-radius: inherit; background: transparent !important; }
+.ora-chat-search input { border: 0 !important; outline: none !important; box-shadow: none !important; border-radius: 0 !important; background: transparent !important; }
+
+/* Chat workspace */
+.ora-messages {
+  background: #070709;
+}
+.ora-chat-list {
+  background: #0a0a0d;
+  border-color: var(--border);
+}
+.ora-chat-list-header {
+  background: #0d0d11;
+  border-color: var(--border);
+}
+.ora-chat-search {
+  background: #17171d;
+  border: 1px solid #202028;
+  border-radius: 9px;
+  min-height: 42px;
+}
+.ora-chat-item {
+  min-height: 74px;
+  border-bottom: 1px solid #18181e;
+}
+.ora-chat-item:hover { background: #111116; }
+.ora-chat-item.is-active { background: #18181f; }
+.ora-chat-window {
+  background:
+    radial-gradient(circle at 20% 15%, rgb(124 58 237 / 0.035), transparent 25%),
+    radial-gradient(circle at 80% 80%, rgb(124 58 237 / 0.025), transparent 25%),
+    #070709;
+}
+.ora-chat-header {
+  background: #0d0d11;
+  border-color: var(--border);
+}
+.ora-chat-body {
+  background: #08080a;
+}
+.ora-message-row { margin: 1px 0; }
+.ora-bubble {
+  border-radius: 14px;
+  padding: 9px 12px;
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.22);
+}
+.ora-bubble-in {
+  background: #19191f;
+  color: #ececf0;
+  border-bottom-left-radius: 4px;
+}
+.ora-bubble-out {
+  background: #6d28d9;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ora-composer {
+  background: #0d0d11;
+  border-color: var(--border);
+}
+.ora-composer textarea {
+  min-height: 44px;
+  border: 1px solid #25252d;
+  background: #17171d;
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.ora-composer textarea:focus {
+  border-color: #6d28d9;
+  box-shadow: 0 0 0 3px rgb(109 40 217 / 0.12);
+}
+
+/* Cleaner profile/media presentation. */
+.ora-profile-shell { background: #070709; }
+.ora-profile-cover { max-height: 250px; }
+.ora-profile-stat { min-width: 82px; background: #0e0e12; border: 1px solid #202028; }
+
+/* Compact, orderly media grids. */
+.ora-post-media { max-width: 680px; overflow: hidden; border-radius: 12px; }
+.ora-post-media.single { max-height: 500px; }
+.ora-post-media.single img { width: 100%; max-height: 500px; object-fit: contain; background: #09090b; }
+.ora-post-media.multi img { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; }
+
+/* Better small-screen density. */
+@media (max-width: 767px) {
+  input:not([type="file"]), select { min-height: 46px; }
+  textarea { min-height: 96px; }
+  .ora-post-media { max-width: 100%; }
+  .ora-chat-list { width: 100%; }
+}
+
+/* ORA visual system: compact, consistent controls across every feature. */
+.primary-button,
+.secondary-button,
+.admin-icon-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: .875rem;
+  line-height: 1;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
+}
+.primary-button { background: var(--primary); color: white; padding: .7rem 1rem; font-weight: 650; }
+.primary-button:hover { background: var(--primary-hover); }
+.primary-button:disabled { opacity: .5; }
+.secondary-button { border: 1px solid var(--border); background: var(--surface-2); color: #e4e4e7; padding: .65rem .9rem; font-weight: 600; }
+.secondary-button:hover { background: var(--surface-3); border-color: #34343d; }
+.secondary-button:disabled { opacity: .5; }
+.icon-button { min-width: 40px; padding: .55rem; color: var(--muted); }
+.icon-button:hover { background: var(--surface-3); color: white; }
+.admin-icon-button { min-width: 34px; min-height: 34px; padding: .45rem; }
+.admin-icon-button:hover { background: var(--surface-3); }
+.field-label { display: block; color: #a1a1aa; font-size: .8rem; font-weight: 500; }
+.field-label input,
+.field-label select,
+.field-label textarea { margin-top: .45rem; }
+
+/* Inputs should feel like fields, not compressed strips. */
+input:not([type="file"]), select, textarea {
+  border-width: 1px;
+  border-style: solid;
+}
+input:not([type="file"]), select { min-height: 46px; }
+textarea { min-height: 104px; }
+
+/* Keep social media legible without allowing one image to dominate the feed. */
+.ora-post-media { max-width: 620px; }
+.ora-post-media.single { max-height: 430px; }
+.ora-post-media.single img { max-height: 430px; }
+.ora-post-media.multi { max-height: 430px; }
+.ora-post-media.multi img { max-height: 210px; }
+
+@media (max-width: 767px) {
+  .ora-post-media { max-width: 100%; }
+  .ora-post-media.single, .ora-post-media.single img { max-height: 360px; }
+  .ora-post-media.multi { max-height: none; }
+  .ora-post-media.multi img { max-height: 180px; }
+  .ora-messages { padding-bottom: 68px; }
+}
+
+/* --------------------------------------------------
+   ORA themes
+   -------------------------------------------------- */
+ :root[data-theme="light"] {
+  color-scheme: dark;
+  /* Graphite theme: calm neutral surfaces with a restrained teal accent. */
+  --background: #0f1417;
+  --surface: #151d21;
+  --surface-2: #1d282d;
+  --surface-3: #26343a;
+  --border: #334148;
+  --border-soft: #28343a;
+  --text: #f1f5f7;
+  --muted: #a9b5bb;
+  --subtle: #7f8d94;
+  --primary: #19a884;
+  --primary-hover: #21bd96;
+}
+
+:root[data-theme="light"] body,
+:root[data-theme="light"] html { background: var(--background); color: var(--text); }
+:root[data-theme="light"] .bg-black,
+:root[data-theme="light"] .bg-zinc-950 { background-color: var(--background) !important; }
+:root[data-theme="light"] .bg-zinc-900 { background-color: var(--surface) !important; }
+:root[data-theme="light"] .bg-zinc-800 { background-color: var(--surface-3) !important; }
+:root[data-theme="light"] .bg-zinc-700 { background-color: #2e3c42 !important; }
+:root[data-theme="light"] .text-white,
+:root[data-theme="light"] .text-zinc-100,
+:root[data-theme="light"] .text-zinc-200 { color: var(--text) !important; }
+:root[data-theme="light"] .text-zinc-300 { color: #d7e0e4 !important; }
+:root[data-theme="light"] .text-zinc-400 { color: #b5c0c5 !important; }
+:root[data-theme="light"] .text-zinc-500 { color: #98a6ad !important; }
+:root[data-theme="light"] .text-zinc-600,
+:root[data-theme="light"] .text-zinc-700 { color: #7e8b92 !important; }
+:root[data-theme="light"] .border-zinc-800 { border-color: var(--border) !important; }
+:root[data-theme="light"] .border-zinc-900 { border-color: var(--border-soft) !important; }
+:root[data-theme="light"] .ora-topbar { background: rgba(15,20,23,.96); border-color: var(--border-soft); }
+:root[data-theme="light"] .ora-bottom-nav { background: rgba(21,29,33,.98); border-top: 1px solid var(--border); backdrop-filter: blur(16px); }
+:root[data-theme="light"] .ora-chat-list,
+:root[data-theme="light"] .ora-chat-window,
+:root[data-theme="light"] .ora-chat-body,
+:root[data-theme="light"] .ora-messages { background: var(--background); }
+:root[data-theme="light"] .ora-chat-list-header,
+:root[data-theme="light"] .ora-chat-header,
+:root[data-theme="light"] .ora-composer { background: var(--surface); border-color: var(--border); }
+:root[data-theme="light"] .ora-chat-search,
+:root[data-theme="light"] .ora-composer textarea { background: var(--surface-2); border-color: var(--border); }
+:root[data-theme="light"] .ora-chat-item:hover,
+:root[data-theme="light"] .ora-chat-item.is-active { background: var(--surface-2); }
+:root[data-theme="light"] .ora-bubble-in { background: #202c31; color: #edf2f4; }
+:root[data-theme="light"] .ora-bubble-out { background: #075e54; color: white; }
+:root[data-theme="light"] .ora-theme-card { background: linear-gradient(135deg, #182226, #1d2b30); border-color: #3a4a51; }
+.ora-theme-option { display:flex; align-items:center; justify-content:center; gap:.5rem; min-height:44px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2); color:var(--muted); font-size:.875rem; font-weight:650; transition:.15s ease; }
+.ora-theme-option:hover { border-color:#19a884; color:var(--text); }
+.ora-theme-option.is-selected { border-color:#19a884; background:rgb(25 168 132 / .14); color:var(--text); box-shadow:0 0 0 2px rgb(25 168 132 / .08); }
+
+.ora-theme-option { display:flex; align-items:center; justify-content:center; gap:.5rem; min-height:44px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2); color:var(--muted); font-size:.875rem; font-weight:650; transition:.15s ease; }
+.ora-theme-option:hover { border-color:#8b5cf6; color:var(--text); }
+.ora-theme-option.is-selected { border-color:#8b5cf6; background:rgb(139 92 246 / .14); color:var(--text); box-shadow:0 0 0 2px rgb(139 92 246 / .08); }
+
+/* Dense but breathable mobile shell. */
+.ora-bottom-nav { background: rgba(11,11,14,.97); border-top: 1px solid var(--border); backdrop-filter: blur(16px); padding-bottom: env(safe-area-inset-bottom); }
+.ora-bottom-nav > div { height: 64px; }
+
+/* Global media containment. */
+.ora-post-media { width: min(100%, 620px); margin-inline: auto; overflow: hidden; border-radius: 14px; }
+.ora-post-media.single { max-height: min(430px, 58vh); }
+.ora-post-media.single img { width: 100%; height: auto; max-height: min(430px, 58vh); object-fit: contain; background: #09090b; }
+.ora-post-media.multi { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 2px; max-height: 430px; }
+.ora-post-media.multi img { width:100%; height: 210px; object-fit:cover; }
+.ora-chat-media img, .ora-chat-media video { display:block; max-width:100%; border-radius:12px; }
+
+/* ORA polish: accessibility, states and responsive rhythm. */
+.ora-page-loading { min-height: 42vh; }
+.ora-error-state { box-shadow: 0 12px 40px rgb(0 0 0 / .12); }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible { outline: 2px solid rgb(167 139 250 / .95); outline-offset: 3px; }
+.ora-social-action { min-width: 64px; min-height: 40px; border-radius: 999px; padding: .45rem .7rem; }
+.ora-social-action:hover { background: rgb(255 255 255 / .04); }
+.ora-media-fallback { min-height: 180px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--muted); }
+
+/* Mobile topbar is deliberately compact: ORA + icon actions, not a desktop-wide search field. */
+.ora-mobile-search-button { display:none; }
+@media (max-width: 767px) {
+  input:not([type="file"]), select { min-height: 46px; }
+  textarea { min-height: 96px; }
+  .ora-post-media { max-width: 100%; }
+  .ora-post-media.single, .ora-post-media.single img { max-height: 56svh; }
+  .ora-post-media.multi { max-height: none; }
+  .ora-post-media.multi img { max-height: 180px; }
+  .ora-messages { min-height: calc(100svh - 3.5rem); padding-bottom: 68px; }
+  main { scroll-margin-top: 3.5rem; }
+  .ora-topbar .ora-desktop-search { display: none; }
+  .ora-topbar .ora-mobile-search-button { display: inline-flex; }
+  .ora-topbar .ora-topbar-inner { height: 52px; padding-inline: 12px; }
+  .ora-topbar .ora-topbar-logo { font-size: 18px; }
+  .ora-topbar .ora-topbar-actions { gap: 2px; }
+  .ora-topbar .ora-mobile-search-button,
+  .ora-topbar .ora-mobile-notification-button { width: 38px; height: 38px; border-radius: 999px; }
+  .ora-social-action { min-width: 52px; }
+  .ora-bottom-nav { padding-bottom: max(env(safe-area-inset-bottom), 4px); }
+  .ora-bottom-nav > div { height: 60px; }
+}
+
+@media (max-width: 1023px) {
+  .ora-topbar { padding-top: env(safe-area-inset-top); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+.ora-chat-media { cursor: zoom-in; }
+.ora-post-media button { cursor: zoom-in; }
+.ora-post-media button:focus-visible { outline: 2px solid rgb(139 92 246 / .9); outline-offset: -2px; }
+
+@media (max-width: 767px) {
+  .ora-topbar .ora-topbar-inner { justify-content: space-between; }
+  .ora-topbar .ora-topbar-actions { margin-left: auto; }
+}
+
+/* --------------------------------------------------
+   ORA THEMES — two complete environments, not flat colors
+   dark = Graphite / light = Luxe Forest
+   -------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b0f12;
+  --surface: #12181d;
+  --surface-2: #1a2228;
+  --surface-3: #242e35;
+  --border: #35414a;
+  --border-soft: #273139;
+  --text: #eef2f4;
+  --muted: #a8b2b8;
+  --subtle: #7b878f;
+  --primary: #7c93a0;
+  --primary-hover: #a7bac5;
+  --success: #7dc7a7;
+  --danger: #e07169;
+}
+
+:root[data-theme="light"] {
+  color-scheme: dark;
+  --background: #04110d;
+  --surface: #0a1914;
+  --surface-2: #10251e;
+  --surface-3: #19352b;
+  --border: #315045;
+  --border-soft: #1d382e;
+  --text: #f3eee2;
+  --muted: #b7b7aa;
+  --subtle: #7f8a80;
+  --primary: #c19b55;
+  --primary-hover: #dfbb70;
+  --success: #7fc39a;
+  --danger: #df756a;
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="light"] body { background: var(--background); color: var(--text); }
+:root[data-theme="dark"] body::before,
+:root[data-theme="light"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .9;
+}
+:root[data-theme="dark"] body::before {
+  background-image:
+    radial-gradient(circle at 18% 14%, rgb(110 135 148 / .12) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 32%, rgb(178 197 207 / .08) 0 1px, transparent 2px),
+    repeating-radial-gradient(ellipse at 20% 100%, transparent 0 36px, rgb(118 141 154 / .055) 37px 38px, transparent 39px 70px),
+    linear-gradient(135deg, transparent 0 47%, rgb(255 255 255 / .018) 48% 49%, transparent 50%);
+  background-size: 34px 34px, 46px 46px, 100% 190px, 140px 140px;
+}
+:root[data-theme="light"] body::before {
+  background-image:
+    radial-gradient(circle at 16% 20%, rgb(194 155 85 / .12) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 62%, rgb(118 157 137 / .12) 0 1px, transparent 2px),
+    repeating-radial-gradient(ellipse at 80% 110%, transparent 0 42px, rgb(111 151 129 / .065) 43px 44px, transparent 45px 82px),
+    linear-gradient(125deg, transparent 0 48%, rgb(218 190 127 / .035) 49% 50%, transparent 51%);
+  background-size: 38px 38px, 52px 52px, 100% 210px, 160px 160px;
+}
+#root { position: relative; z-index: 1; }
+
+:root[data-theme="dark"] .bg-black,
+:root[data-theme="light"] .bg-black,
+:root[data-theme="dark"] .bg-zinc-950,
+:root[data-theme="light"] .bg-zinc-950 { background-color: var(--background) !important; }
+:root[data-theme="dark"] .bg-zinc-900,
+:root[data-theme="light"] .bg-zinc-900 { background-color: var(--surface) !important; }
+:root[data-theme="dark"] .bg-zinc-800,
+:root[data-theme="light"] .bg-zinc-800 { background-color: var(--surface-3) !important; }
+:root[data-theme="dark"] .bg-zinc-700 { background-color: #303c44 !important; }
+:root[data-theme="light"] .bg-zinc-700 { background-color: #24463a !important; }
+:root[data-theme="dark"] .text-white,
+:root[data-theme="light"] .text-white,
+:root[data-theme="dark"] .text-zinc-100,
+:root[data-theme="light"] .text-zinc-100,
+:root[data-theme="dark"] .text-zinc-200,
+:root[data-theme="light"] .text-zinc-200 { color: var(--text) !important; }
+:root[data-theme="dark"] .text-zinc-300 { color: #d7dfe4 !important; }
+:root[data-theme="light"] .text-zinc-300 { color: #e0dccf !important; }
+:root[data-theme="dark"] .text-zinc-400 { color: #aab5bc !important; }
+:root[data-theme="light"] .text-zinc-400 { color: #b8b8ac !important; }
+:root[data-theme="dark"] .text-zinc-500 { color: #8d99a1 !important; }
+:root[data-theme="light"] .text-zinc-500 { color: #989b91 !important; }
+:root[data-theme="dark"] .text-zinc-600 { color: #6f7b83 !important; }
+:root[data-theme="light"] .text-zinc-600 { color: #788278 !important; }
+:root[data-theme="dark"] .border-zinc-800,
+:root[data-theme="light"] .border-zinc-800 { border-color: var(--border) !important; }
+:root[data-theme="dark"] .border-zinc-900,
+:root[data-theme="light"] .border-zinc-900 { border-color: var(--border-soft) !important; }
+
+:root[data-theme="dark"] .ora-topbar { background: rgb(11 15 18 / .88); border-color: var(--border); backdrop-filter: blur(20px); }
+:root[data-theme="light"] .ora-topbar { background: rgb(4 17 13 / .88); border-color: var(--border); backdrop-filter: blur(20px); }
+:root[data-theme="dark"] .ora-bottom-nav { background: rgb(18 24 29 / .94); border-top-color: var(--border); }
+:root[data-theme="light"] .ora-bottom-nav { background: rgb(10 25 20 / .94); border-top-color: var(--border); }
+:root[data-theme="dark"] .ora-chat-list { background: rgb(12 17 21 / .92); border-color: var(--border); }
+:root[data-theme="light"] .ora-chat-list { background: rgb(5 18 14 / .92); border-color: var(--border); }
+:root[data-theme="dark"] .ora-chat-list-header,
+:root[data-theme="dark"] .ora-chat-header,
+:root[data-theme="dark"] .ora-composer { background: rgb(18 24 29 / .90); border-color: var(--border); }
+:root[data-theme="light"] .ora-chat-list-header,
+:root[data-theme="light"] .ora-chat-header,
+:root[data-theme="light"] .ora-composer { background: rgb(10 25 20 / .90); border-color: var(--border); }
+:root[data-theme="dark"] .ora-chat-search,
+:root[data-theme="dark"] .ora-composer textarea { background: #192329; border-color: #36434c; }
+:root[data-theme="light"] .ora-chat-search,
+:root[data-theme="light"] .ora-composer textarea { background: #10251e; border-color: #315045; }
+:root[data-theme="dark"] .ora-chat-item:hover,
+:root[data-theme="dark"] .ora-chat-item.is-active { background: #202b32; }
+:root[data-theme="light"] .ora-chat-item:hover,
+:root[data-theme="light"] .ora-chat-item.is-active { background: #153027; }
+:root[data-theme="dark"] .ora-bubble-in { background: #202b32; color: #eef2f4; box-shadow: 0 8px 28px rgb(0 0 0 / .12); }
+:root[data-theme="dark"] .ora-bubble-out { background: #30414a; color: #fff; box-shadow: 0 8px 28px rgb(0 0 0 / .14); }
+:root[data-theme="light"] .ora-bubble-in { background: #173027; color: #eee9dc; box-shadow: 0 8px 28px rgb(0 0 0 / .14); }
+:root[data-theme="light"] .ora-bubble-out { background: #145c48; color: #fffaf0; box-shadow: 0 8px 28px rgb(0 0 0 / .16); }
+:root[data-theme="dark"] .ora-chat-window,
+:root[data-theme="dark"] .ora-chat-body { background-color: #0a1014; }
+:root[data-theme="light"] .ora-chat-window,
+:root[data-theme="light"] .ora-chat-body { background-color: #06120e; }
+
+/* Map the legacy utility accent into each theme instead of leaving plum hard-coded. */
+:root[data-theme="dark"] .bg-violet-600 { background-color: #607987 !important; }
+:root[data-theme="dark"] .hover\:bg-violet-500:hover { background-color: #78919e !important; }
+:root[data-theme="dark"] .text-violet-400,
+:root[data-theme="dark"] .text-violet-300 { color: #a8c0cc !important; }
+:root[data-theme="dark"] .border-violet-500,
+:root[data-theme="dark"] .border-violet-600 { border-color: #6e8795 !important; }
+:root[data-theme="dark"] .focus\:border-violet-600:focus { border-color: #8ea6b2 !important; }
+:root[data-theme="light"] .bg-violet-600 { background-color: #a9864a !important; }
+:root[data-theme="light"] .hover\:bg-violet-500:hover { background-color: #c19b55 !important; }
+:root[data-theme="light"] .text-violet-400,
+:root[data-theme="light"] .text-violet-300 { color: #d2b36e !important; }
+:root[data-theme="light"] .border-violet-500,
+:root[data-theme="light"] .border-violet-600 { border-color: #a9864a !important; }
+:root[data-theme="light"] .focus\:border-violet-600:focus { border-color: #c19b55 !important; }
+
+.ora-theme-option { position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; gap:.5rem; min-height:54px; border:1px solid var(--border); border-radius:14px; background:var(--surface-2); color:var(--muted); font-size:.875rem; font-weight:700; transition:.18s ease; }
+.ora-theme-option::before { content:""; position:absolute; inset:0; opacity:.5; pointer-events:none; }
+.ora-theme-option.theme-graphite::before { background-image: radial-gradient(circle, rgb(175 196 208 / .16) 1px, transparent 1.5px), repeating-radial-gradient(ellipse at 10% 120%, transparent 0 18px, rgb(155 181 194 / .10) 19px 20px, transparent 21px 38px); background-size:16px 16px,100% 74px; }
+.ora-theme-option.theme-luxe::before { background-image: radial-gradient(circle, rgb(211 177 98 / .18) 1px, transparent 1.5px), repeating-radial-gradient(ellipse at 90% 120%, transparent 0 20px, rgb(104 151 126 / .12) 21px 22px, transparent 23px 42px); background-size:18px 18px,100% 82px; }
+.ora-theme-option > * { position:relative; z-index:1; }
+:root[data-theme="dark"] .ora-theme-option.is-selected { border-color:#8199a6; background:#25323a; box-shadow:0 0 0 2px rgb(129 153 166 / .12); color:#eef2f4; }
+:root[data-theme="light"] .ora-theme-option.is-selected { border-color:#c19b55; background:#19352b; box-shadow:0 0 0 2px rgb(193 155 85 / .14); color:#f3eee2; }
+
+/* Ambient texture also follows the selected theme across non-chat pages. */
+:root[data-theme="dark"] .ora-page,
+:root[data-theme="dark"] .ora-theme-card,
+:root[data-theme="dark"] .ora-account-switcher,
+:root[data-theme="dark"] main {
+  background-image: radial-gradient(circle at 90% 10%, rgb(119 148 162 / .05), transparent 28%), repeating-radial-gradient(ellipse at 0 100%, transparent 0 56px, rgb(111 138 151 / .035) 57px 58px, transparent 59px 112px);
+}
+:root[data-theme="light"] .ora-page,
+:root[data-theme="light"] .ora-theme-card,
+:root[data-theme="light"] .ora-account-switcher,
+:root[data-theme="light"] main {
+  background-image: radial-gradient(circle at 90% 10%, rgb(193 155 85 / .06), transparent 28%), repeating-radial-gradient(ellipse at 0 100%, transparent 0 60px, rgb(89 137 112 / .04) 61px 62px, transparent 63px 120px);
+}
+
+/* Luxury chat wallpapers. */
+:root[data-wallpaper="silk"] .ora-chat-body { background-image: url('/wallpapers/ora-luxe-silk.svg'); background-size: 720px 720px; }
+:root[data-wallpaper="botanical"] .ora-chat-body { background-image: url('/wallpapers/ora-luxe-botanical.svg'); background-size: 720px 720px; }
+:root[data-wallpaper="stars"] .ora-chat-body { background-image: url('/wallpapers/ora-luxe-stars.svg'); background-size: 720px 720px; }
+.ora-chat-body { background-repeat: repeat; background-attachment: local; }
+.ora-wallpaper-option { position: relative; min-height: 74px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background-color: #07120f; background-size: cover; color: #e8ddc3; font-size: .72rem; font-weight: 700; text-shadow: 0 1px 5px #000; }
+.ora-wallpaper-option span { position: relative; z-index: 1; }
+.ora-wallpaper-option.wallpaper-silk { background-image: url('/wallpapers/ora-luxe-silk.svg'); }
+.ora-wallpaper-option.wallpaper-botanical { background-image: url('/wallpapers/ora-luxe-botanical.svg'); }
+.ora-wallpaper-option.wallpaper-stars { background-image: url('/wallpapers/ora-luxe-stars.svg'); }
+.ora-wallpaper-option.is-selected { border-color: #c7a45f; box-shadow: 0 0 0 2px rgb(199 164 95 / .16), inset 0 0 0 1px rgb(255 235 190 / .08); }
+
+/* Receiver-side view-once media: reveal first, then start the 12-second window. */
+.ora-chat-media.is-unviewed img,
+.ora-chat-media.is-unviewed video { filter: blur(22px) saturate(.55) brightness(.58); transform: scale(1.045); }
+.ora-chat-media.is-unviewed { background: #101815; }
+.ora-chat-media.is-unviewed .ora-media-lock { background: rgba(5,14,12,.78); border: 1px solid rgba(216,190,130,.2); box-shadow: 0 8px 30px rgba(0,0,0,.32); backdrop-filter: blur(8px); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="dark"] body::before,
+  :root[data-theme="light"] body::before { opacity:.65; }
+}
+
+
+/* Power Hour profile frames */
+.ora-profile-frame::before {
+  content: ""; position: absolute; inset: -5px; border-radius: 9999px; pointer-events: none; z-index: 0;
+}
+.ora-profile-frame-halo::before { box-shadow: 0 0 0 2px rgba(217, 181, 92, .9), 0 0 22px rgba(217, 181, 92, .35); }
+.ora-profile-frame-orbit::before { box-shadow: 0 0 0 2px rgba(96, 165, 250, .85), 0 0 18px rgba(96, 165, 250, .28); }
+.ora-profile-frame-royal::before { box-shadow: 0 0 0 2px rgba(168, 85, 247, .85), 0 0 24px rgba(168, 85, 247, .32); }
+
+
+.ora-premium-locked {
+  filter: saturate(.7) blur(.05px);
+  position: relative;
+  overflow: visible !important;
+}
+
+/* Keep the underlying control visible and usable as a clear upgrade affordance.
+   The old full-surface overlay hid small controls such as the video button. */
+.ora-premium-locked::after {
+  content: "₦100";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 30px;
+  height: 16px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(245,225,170,.35);
+  border-radius: 9999px;
+  background: rgba(18,15,10,.96);
+  color: rgba(245,225,170,.98);
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .04em;
+  box-shadow: 0 4px 12px rgba(0,0,0,.28);
+  pointer-events: none;
+  z-index: 3;
+}
