@@ -67,7 +67,7 @@ export default function AppShell({ children }: AppShellProps) {
         </aside>
 
         {/* Main Content */}
-        <main className={`min-h-screen min-w-0 flex-1 ${isMessages ? "border-0" : "border-x border-zinc-800 pb-16 lg:pb-0"}`}>
+        <main className={`min-h-screen min-w-0 flex-1 ${isMessages ? "border-0" : "border-x border-zinc-800"}`}>
           {children}
         </main>
 

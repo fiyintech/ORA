@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Search, Send, Smile, Square, Trash2, UserPlus, Video, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, Check, CheckCheck, Copy, Forward, ImagePlus, Loader2, Lock, MessageCircle, Mic, MoreVertical, Plus, Search, Send, Smile, Trash2, UserPlus, Video, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -25,90 +25,81 @@ function formatListTime(timestamp?: string | null) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 function formatMessageTime(timestamp: string) { return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+function formatDaySeparator(timestamp: string) {
+  const date = new Date(timestamp); const now = new Date();
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  if (start.getTime() === today.getTime()) return "Today";
+  if (start.getTime() === yesterday.getTime()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+}
 function BubbleStatus({ message }: { message: Message }) { return message.deleted_at ? null : message.read_at ? <CheckCheck size={13} /> : <Check size={13} />; }
 
-function MediaMessage({ message, own, onViewed, onExpired, onListened }: { message: Message; own: boolean; onViewed: (message: Message) => Promise<Message | null>; onExpired: (message: Message) => Promise<void>; onListened: (message: Message) => Promise<void> }) {
+function MediaMessage({ message, own, onExpired, onCompleted }: { message: Message; own: boolean; onExpired: (message: Message) => Promise<void>; onCompleted: (message: Message) => Promise<Message | null> }) {
   const [mediaFailed, setMediaFailed] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewedMedia, setViewedMedia] = useState<Message | null>(null);
+  const [completedMedia, setCompletedMedia] = useState<Message | null>(null);
   const [localExpiry, setLocalExpiry] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(own || Boolean(message.media_viewed_at));
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const completionSentRef = useRef(false);
 
+  useEffect(() => { setMediaFailed(false); }, [message.media_url]);
+  useEffect(() => { setRevealed(own || Boolean(message.media_viewed_at)); }, [message.media_viewed_at, own]);
   useEffect(() => {
-    setMediaFailed(false);
-  }, [message.media_url]);
-
-  useEffect(() => {
-    const expiry = localExpiry ?? (viewedMedia?.media_viewed_at ? new Date(new Date(viewedMedia.media_viewed_at).getTime() + 12000).toISOString() : null);
-    if (!expiry) return;
+    const expiry = localExpiry ?? completedMedia?.media_expires_at ?? message.media_expires_at ?? null;
+    if (!expiry) { setSecondsLeft(null); return; }
     const update = () => setSecondsLeft(Math.max(0, Math.ceil((new Date(expiry).getTime() - Date.now()) / 1000)));
     update();
     const timer = window.setInterval(update, 250);
     return () => window.clearInterval(timer);
-  }, [localExpiry, viewedMedia?.media_expires_at, viewedMedia?.media_viewed_at]);
-
+  }, [localExpiry, completedMedia?.media_expires_at]);
   useEffect(() => {
-    if (viewedMedia?.media_type === "audio") return;
-    if (!viewedMedia?.media_expires_at || secondsLeft !== 0) return;
-    void onExpired(viewedMedia);
-  }, [onExpired, secondsLeft, viewedMedia]);
+    if (!completedMedia?.media_expires_at || secondsLeft !== 0) return;
+    void onExpired(completedMedia);
+  }, [onExpired, secondsLeft, completedMedia]);
 
   if (!message.media_url) return null;
-  if (mediaFailed) return <div className="ora-media-fallback rounded-xl text-xs">Shared media is unavailable</div>;
+  if (mediaFailed) return <div className="ora-media-fallback text-xs">Shared media is unavailable</div>;
+
+  async function completeMedia() {
+    if (own || completionSentRef.current) return;
+    completionSentRef.current = true;
+    const updated = await onCompleted(message);
+    if (!updated) { completionSentRef.current = false; return; }
+    setCompletedMedia(updated);
+    setLocalExpiry(updated.media_expires_at);
+  }
 
   async function openViewer() {
-    if (message.media_type === "audio") {
-      if (!own && !message.media_viewed_at) {
-        try {
-          const updated = await onViewed(message);
-          if (!updated) return;
-          setRevealed(true);
-          setViewedMedia(updated);
-        } catch { return; }
-      } else {
-        setRevealed(true);
-      }
-      window.setTimeout(() => { void audioRef.current?.play().catch(() => undefined); }, 0);
-      return;
-    }
-    if (!own && !message.media_viewed_at) {
-      try {
-        const updated = await onViewed(message);
-        if (updated) { setViewedMedia(updated); setLocalExpiry(new Date(Date.now() + 12000).toISOString()); }
-      } catch {
-        // The parent displays the actionable error; don't open stale media.
-        return;
-      }
-    } else if (message.media_viewed_at) {
-      setViewedMedia(message);
-      setLocalExpiry(new Date(new Date(message.media_viewed_at).getTime() + 12000).toISOString());
+    setRevealed(true);
+    if (mediaType === "image" && !own && !message.media_viewed_at && !completedMedia) {
+      await completeMedia();
+      if (!completionSentRef.current) return;
     }
     setViewerOpen(true);
   }
 
   const mediaType = message.media_type === "video" ? "video" : "image";
   if (message.media_type === "audio") {
-    return <div className={`ora-chat-media rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 ${!revealed ? "blur-[1px]" : ""}`}>
-      {!revealed ? <button type="button" onClick={() => void openViewer()} className="flex w-full items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600/15 text-violet-300"><Mic size={17} /></span><span><span className="block text-xs font-semibold text-zinc-200">Voice note</span><span className="block text-[10px] text-zinc-500">Tap to listen · disappears after listening</span></span><Lock size={14} className="ml-auto text-amber-300" /></button> : <audio ref={audioRef} src={message.media_url} controls preload="metadata" onEnded={() => { if (!own) void onListened(message); }} className="w-full" />}
+    return <div className={`ora-chat-media ${!revealed ? "blur-[1px]" : ""}`}>
+      {!revealed ? <button type="button" onClick={() => setRevealed(true)} className="flex w-full items-center gap-3 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600/15 text-violet-300"><Mic size={17} /></span><span><span className="block text-xs font-semibold text-zinc-200">Voice note</span><span className="block text-[10px] text-zinc-500">Tap to listen · disappears 12s after playback</span></span><Lock size={14} className="ml-auto text-amber-300" /></button> : <audio
+            ref={audioRef}
+            src={message.media_url}
+            controls
+            preload="metadata"
+            onPlay={() => { void completeMedia(); }}
+            className="w-full"
+          />}
     </div>;
   }
   return <>
-    <button type="button" onClick={() => void openViewer()} className={`ora-chat-media group relative block max-w-full overflow-hidden rounded-xl text-left ${!own && !message.media_viewed_at ? "is-unviewed" : ""}`} aria-label={`Open ${mediaType} full screen`}>
-      {mediaType === "video" ? (
-        <div className="relative"><video src={message.media_url} muted playsInline preload="metadata" onLoadedMetadata={() => setMediaFailed(false)} onError={() => setMediaFailed(true)} className="pointer-events-none max-h-[340px] w-full object-contain transition duration-300" />
-          {!own && !message.media_viewed_at ? <span className="ora-media-lock pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-amber-100"><span className="text-sm">◉</span> Tap to view</span> : null}
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">{!own && !message.media_viewed_at ? "Tap to reveal and start the timer" : "Tap to view full screen"}</span>
-        </div>
-      ) : (
-        <div className="relative"><img src={message.media_url} alt="Shared photo" loading="lazy" onError={() => setMediaFailed(true)} className="max-h-[340px] w-auto max-w-full object-contain transition duration-300" />
-          {!own && !message.media_viewed_at ? <span className="ora-media-lock pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-amber-100"><span className="text-sm">◉</span> Tap to view</span> : null}
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">{!own && !message.media_viewed_at ? "Tap to reveal and start the timer" : "Tap to view full screen"}</span>
-        </div>
-      )}
+    <button type="button" onClick={() => void openViewer()} className={`ora-chat-media group relative block max-w-full overflow-hidden text-left ${!own && !message.media_viewed_at ? "is-unviewed" : ""}`} aria-label={`Open ${mediaType} full screen`}>
+      {mediaType === "video" ? <div className="relative"><video src={message.media_url} muted playsInline preload="metadata" className="pointer-events-none max-h-[340px] w-full object-contain transition duration-300" /><span className="ora-media-lock pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-100">◉ Tap to view</span></div> : <div className="relative"><img src={message.media_url} alt="Shared photo" loading="lazy" onError={() => setMediaFailed(true)} className="max-h-[340px] w-auto max-w-full object-contain transition duration-300" /></div>}
     </button>
-    {viewerOpen ? <MediaLightbox url={message.media_url} type={mediaType} title={mediaType === "video" ? "Shared video" : "Shared photo"} expiresAt={!own ? localExpiry : null} onClose={() => setViewerOpen(false)} /> : null}
+    {viewerOpen ? <MediaLightbox url={message.media_url} type={mediaType} title={mediaType === "video" ? "Shared video" : "Shared photo"} expiresAt={completedMedia?.media_expires_at ?? null} onEnded={mediaType === "video" ? () => void completeMedia() : undefined} onClose={() => setViewerOpen(false)} /> : null}
   </>;
 }
 
@@ -141,10 +132,9 @@ export default function MessagesPage() {
   const [error, setError] = useState("");
   const [menuId, setMenuId] = useState<string | null>(null);
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
-  const [composerPanel, setComposerPanel] = useState<"emoji" | null>(null);
+  const [composerPanel, setComposerPanel] = useState<"emoji" | "actions" | null>(null);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
   const emojiPanelRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const chatBodyRef = useRef<HTMLDivElement | null>(null);
@@ -536,7 +526,6 @@ export default function MessagesPage() {
       setError(err instanceof Error ? err.message : "Unable to forward this message.");
     }
   }
-  const markViewed = useCallback(async (message: Message): Promise<Message | null> => { if (!message.media_url || message.media_viewed_at || message.sender_id === currentUserId) return message; try { const updated = await messageService.markMediaViewed(message.id); setMessages((current) => current.map((m) => m.id === updated.id ? updated : m)); return updated; } catch (err) { setError(err instanceof Error ? err.message : "Unable to open this media."); return null; } }, [currentUserId]);
   const expireViewedMedia = useCallback(async (message: Message) => {
     setMessages((current) => current.filter((m) => m.id !== message.id));
     try { await messageService.consumeViewedMedia(message.id); } catch (err) { console.error("Unable to consume viewed chat media", err); }
@@ -546,7 +535,7 @@ export default function MessagesPage() {
     if (!composerPanel) return;
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (emojiPanelRef.current?.contains(target) || emojiButtonRef.current?.contains(target)) return;
+      if (emojiPanelRef.current?.contains(target) || (target as HTMLElement).closest(".ora-composer-actions")) return;
       setComposerPanel(null);
     };
     document.addEventListener("pointerdown", handlePointerDown);
@@ -587,7 +576,7 @@ export default function MessagesPage() {
             onScroll={handleChatScroll}
             className="ora-chat-body min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"
           >
-            {loadingMessages ? <div className="flex h-full items-center justify-center text-xs text-zinc-600"><Loader2 size={18} className="mr-2 animate-spin" />Loading messages...</div> : messages.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><Avatar profile={otherProfile} /><h3 className="mt-3 text-sm font-semibold text-zinc-300">Start a conversation</h3><p className="mt-1 text-xs text-zinc-600">Say hello to {otherProfile?.display_name || "this person"}.</p></div> : <div className="mx-auto flex w-full max-w-3xl flex-col gap-1.5">{messages.map((message) => { const own = message.sender_id === currentUserId; const deleted = Boolean(message.deleted_at); return <div key={message.id} className={`ora-message-row group flex ${own ? "justify-end" : "justify-start"}`} onContextMenu={(event) => { if (deleted) return; event.preventDefault(); setMenuId(message.id); }}><div className={`relative flex max-w-[82%] flex-col ${own ? "items-end" : "items-start"}`}><div className={`ora-bubble text-sm ${deleted ? "border border-zinc-800 bg-zinc-900/70 italic text-zinc-600" : own ? "ora-bubble-out" : "ora-bubble-in"}`}>{deleted ? <p className="italic text-zinc-500">This message was deleted</p> : <>{message.media_url && <MediaMessage message={message} own={own} onViewed={markViewed} onExpired={expireViewedMedia} onListened={async (message) => { setMessages((current) => current.filter((m) => m.id !== message.id)); try { await messageService.consumeViewedMedia(message.id, true); } catch (err) { setError(err instanceof Error ? err.message : "Unable to consume voice note."); } }} />}{message.content && <p className={message.media_url ? "mt-2 whitespace-pre-wrap" : "whitespace-pre-wrap"}>{message.content}</p>}</>}</div><div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] text-zinc-600 ${own ? "justify-end" : "justify-start"}`}><span>{formatMessageTime(message.created_at)}</span>{own && <span className={message.read_at ? "text-violet-400" : "text-zinc-600"}><BubbleStatus message={message} /></span>} {!deleted && <div className="relative"><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setMenuId((value) => value === message.id ? null : message.id)} className="rounded p-1 text-zinc-600 hover:bg-zinc-900 hover:text-white" aria-label="Message options"><MoreVertical size={13} /></button>{menuId === message.id && <div onMouseDown={(event) => event.stopPropagation()} className="ora-message-menu absolute bottom-7 right-0 z-30 w-48 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950/95 p-1.5 shadow-2xl backdrop-blur"><button type="button" onClick={() => { if (!premiumActive) { setMenuId(null); navigate("/premium"); return; } setForwardingMessage(message); setMenuId(null); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-800" : "ora-premium-locked text-amber-200"}`}><Forward size={15} />{premiumActive ? "Forward" : "Forward · Power Hour"}</button>{message.content ? <button type="button" onClick={() => void copyMessage(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"><Copy size={15} />Copy</button> : null}<div className="my-1 border-t border-zinc-800" />{own ? <><button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-300 hover:bg-zinc-800"><Trash2 size={15} />Delete for me</button><button type="button" onClick={() => void deleteForEveryone(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for everyone</button></> : <button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for me</button>}</div>}</div>}</div></div></div>; })}<div ref={endRef} /></div>}
+            {loadingMessages ? <div className="flex h-full items-center justify-center text-xs text-zinc-600"><Loader2 size={18} className="mr-2 animate-spin" />Loading messages...</div> : messages.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><Avatar profile={otherProfile} /><h3 className="mt-3 text-sm font-semibold text-zinc-300">Start a conversation</h3><p className="mt-1 text-xs text-zinc-600">Say hello to {otherProfile?.display_name || "this person"}.</p></div> : <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">{messages.map((message, index) => { const own = message.sender_id === currentUserId; const deleted = Boolean(message.deleted_at); const previous = messages[index - 1]; const dayChanged = !previous || new Date(previous.created_at).toDateString() !== new Date(message.created_at).toDateString(); return <div key={message.id}>{dayChanged ? <div className="my-4 flex items-center gap-3 px-2"><div className="h-px flex-1 bg-zinc-900" /><span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">{formatDaySeparator(message.created_at)}</span><div className="h-px flex-1 bg-zinc-900" /></div> : null}<div className={`ora-message-row group flex ${own ? "justify-end" : "justify-start"}`} onContextMenu={(event) => { if (deleted) return; event.preventDefault(); setMenuId(message.id); }}><div className={`relative flex max-w-[82%] flex-col ${own ? "items-end" : "items-start"}`}><div className={`ora-bubble text-sm ${deleted ? "border border-zinc-800 bg-zinc-900/70 italic text-zinc-600" : own ? "ora-bubble-out" : "ora-bubble-in"}`}>{deleted ? <p className="italic text-zinc-500">This message was deleted</p> : <>{message.media_url && <MediaMessage message={message} own={own} onExpired={expireViewedMedia} onCompleted={async (item) => { try { const updated = await messageService.markMediaViewed(item.id); setMessages((current) => current.map((m) => m.id === updated.id ? updated : m)); return updated; } catch (err) { setError(err instanceof Error ? err.message : "Unable to start media expiry."); return null; } }} />}{message.content && <p className={message.media_url ? "mt-2 whitespace-pre-wrap" : "whitespace-pre-wrap"}>{message.content}</p>}</>}</div><div className={`mt-0.5 flex items-center gap-1 px-1 text-[10px] text-zinc-600 ${own ? "justify-end" : "justify-start"}`}><span>{formatMessageTime(message.created_at)}</span>{own && <span className={message.read_at ? "text-violet-400" : "text-zinc-600"}><BubbleStatus message={message} /></span>} {!deleted && <div className="relative"><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => setMenuId((value) => value === message.id ? null : message.id)} className="rounded p-1 text-zinc-600 hover:bg-zinc-900 hover:text-white" aria-label="Message options"><MoreVertical size={13} /></button>{menuId === message.id && <div onMouseDown={(event) => event.stopPropagation()} className="ora-message-menu absolute bottom-7 right-0 z-30 w-48 overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950/95 p-1.5 shadow-2xl backdrop-blur"><button type="button" onClick={() => { if (!premiumActive) { setMenuId(null); navigate("/premium"); return; } setForwardingMessage(message); setMenuId(null); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-800" : "ora-premium-locked text-amber-200"}`}><Forward size={15} />{premiumActive ? "Forward" : "Forward · Power Hour"}</button>{message.content ? <button type="button" onClick={() => void copyMessage(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"><Copy size={15} />Copy</button> : null}<div className="my-1 border-t border-zinc-800" />{own ? <><button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-300 hover:bg-zinc-800"><Trash2 size={15} />Delete for me</button><button type="button" onClick={() => void deleteForEveryone(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for everyone</button></> : <button type="button" onClick={() => void deleteForMe(message)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-red-400 hover:bg-red-950/30"><Trash2 size={15} />Delete for me</button>}</div>}</div>}</div></div></div></div>; })}<div ref={endRef} /></div>}
           </div>
           {showJumpToLatest ? (
             <button
@@ -614,7 +603,15 @@ export default function MessagesPage() {
                 {attachments.map((file, index) => <button key={`${file.name}-${file.lastModified}-${index}`} type="button" onClick={() => removeAttachment(index)} className="flex max-w-full items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 text-left text-[10px] text-zinc-400 hover:border-zinc-700 hover:text-zinc-200" title="Remove this attachment"><span className="shrink-0 text-violet-300">{file.type.startsWith("video/") ? <Video size={13} /> : file.type.startsWith("audio/") ? <Mic size={13} /> : <ImagePlus size={13} />}</span><span className="max-w-[180px] truncate">{file.name}</span><X size={11} className="shrink-0 text-zinc-600" /></button>)}
               </div>
             </div>}
-            {composerPanel ? <div ref={emojiPanelRef} className="mx-auto mb-2 max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-zinc-300">Emoji</p><button type="button" onClick={() => setComposerPanel(null)} className="icon-button h-8 w-8" aria-label="Close emoji picker"><X size={15} /></button></div><div className="mb-2 flex gap-1 overflow-x-auto border-b border-zinc-800 pb-2">{emojiCategoryNames.map((category) => <button key={category} type="button" onClick={() => setEmojiCategory(category)} className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${emojiCategory === category ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200"}`}>{category}</button>)}</div><div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto pr-1 sm:grid-cols-12">{emojiCategories[emojiCategory].map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => setText((value) => `${value}${emoji}`)} className="flex h-9 items-center justify-center rounded-lg text-xl hover:bg-zinc-800" aria-label={`Insert ${emoji}`}>{emoji}</button>)}</div></div> : null}<form onSubmit={(e) => { e.preventDefault(); void sendMessage(); }} className="mx-auto flex max-w-3xl items-end gap-1.5"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" multiple={premiumActive} hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><input id="ora-video-input" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/mpeg,video/x-m4v" hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><button ref={emojiButtonRef} type="button" onClick={() => setComposerPanel((value) => value === "emoji" ? null : "emoji")} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${composerPanel === "emoji" ? "bg-zinc-800 text-violet-400" : ""}`} aria-label="Emoji" title="Emoji"><Smile size={19} /></button><button type="button" onClick={() => fileRef.current?.click()} disabled={sending || recording} className="icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full" aria-label="Send photo" title="Send photo"><ImagePlus size={19} /></button><button type="button" onClick={() => { if (!premiumActive) { navigate("/premium"); return; } document.getElementById("ora-video-input")?.click(); }} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${!premiumActive ? "ora-premium-locked" : ""}`} aria-label="Send video" title={premiumActive ? "Send video · up to 50 MB" : "Send video · Power Hour required"}><Video size={19} /></button><button type="button" onClick={() => { if (recording) stopRecording(); else if (!premiumActive) void startRecording(); else void startRecording(); }} disabled={sending} className={`icon-button mb-0.5 h-11 w-11 shrink-0 rounded-full ${recording ? "bg-red-600/20 text-red-300" : ""}`} aria-label={recording ? "Stop voice note" : "Record voice note"} title={recording ? `Stop recording · ${recordingSeconds}s` : premiumActive ? "Record voice note" : `Record voice note · ${Math.max(0, Math.floor((voiceRemainingMs ?? 60000) / 1000))}s left today`}>{recording ? <Square size={17} /> : <Mic size={19} />}</button><div className="min-w-0 flex-1"><textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} rows={1} maxLength={maxMessageLength} disabled={sending} placeholder={attachments.length > 0 ? "Add a caption…" : "Type a message"} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-600" /><div className="mt-1 flex justify-end px-1 text-[10px] text-zinc-600">{text.length}/{maxMessageLength}</div></div><button type="submit" disabled={sending || recording || (!text.trim() && attachments.length === 0)} className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">{sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}</button></form>
+            {composerPanel === "emoji" ? <div ref={emojiPanelRef} className="mx-auto mb-2 max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-zinc-300">Emoji</p><button type="button" onClick={() => setComposerPanel(null)} className="icon-button h-8 w-8" aria-label="Close emoji picker"><X size={15} /></button></div><div className="mb-2 flex gap-1 overflow-x-auto border-b border-zinc-800 pb-2">{emojiCategoryNames.map((category) => <button key={category} type="button" onClick={() => setEmojiCategory(category)} className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${emojiCategory === category ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200"}`}>{category}</button>)}</div><div className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto pr-1 sm:grid-cols-12">{emojiCategories[emojiCategory].map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => setText((value) => `${value}${emoji}`)} className="flex h-9 items-center justify-center rounded-lg text-xl hover:bg-zinc-800" aria-label={`Insert ${emoji}`}>{emoji}</button>)}</div></div> : null}<form onSubmit={(e) => { e.preventDefault(); void sendMessage(); }} className="mx-auto flex max-w-3xl items-end gap-1.5"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" multiple={premiumActive} hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><input id="ora-video-input" type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg,video/mpeg,video/x-m4v" hidden onChange={(e) => { chooseAttachments(e.target.files ?? undefined); e.currentTarget.value = ""; }} /><div className="ora-composer-actions relative shrink-0">
+                <button type="button" onClick={() => setComposerPanel((value) => value === "actions" ? null : "actions")} disabled={sending || recording} className={`icon-button mb-0.5 h-11 w-11 rounded-full ${composerPanel === "actions" ? "bg-zinc-800 text-violet-400" : ""}`} aria-label="More message actions" title="Attachments and tools"><Plus size={20} /></button>
+                {composerPanel === "actions" ? <div className="absolute bottom-14 left-0 z-40 w-52 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl">
+                  <button type="button" onClick={() => { setComposerPanel("emoji"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900"><Smile size={17} />Emoji</button>
+                  <button type="button" onClick={() => { setComposerPanel(null); fileRef.current?.click(); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-zinc-200 hover:bg-zinc-900"><ImagePlus size={17} />Photo{premiumActive ? "s" : ""}</button>
+                  <button type="button" onClick={() => { if (!premiumActive) { navigate("/premium"); return; } setComposerPanel(null); document.getElementById("ora-video-input")?.click(); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${premiumActive ? "text-zinc-200 hover:bg-zinc-900" : "ora-premium-locked text-amber-200"}`}><Video size={17} />Video{premiumActive ? "" : " · Power Hour"}</button>
+                  <button type="button" onClick={() => { setComposerPanel(null); if (recording) stopRecording(); else void startRecording(); }} disabled={sending} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs ${recording ? "text-red-300" : "text-zinc-200 hover:bg-zinc-900"}`}><Mic size={17} />{recording ? `Stop recording · ${recordingSeconds}s` : "Voice note"}</button>
+                </div> : null}
+              </div><div className="min-w-0 flex-1"><textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} rows={1} maxLength={maxMessageLength} disabled={sending} placeholder={attachments.length > 0 ? "Add a caption…" : "Type a message"} className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-600" /><div className="mt-1 flex justify-end px-1 text-[10px] text-zinc-600">{text.length}/{maxMessageLength}</div></div><button type="submit" disabled={sending || recording || (!text.trim() && attachments.length === 0)} className="mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">{sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}</button></form>
           </div>
         </>}
       </section>

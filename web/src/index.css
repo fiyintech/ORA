@@ -617,3 +617,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid rgb(167 139 250 / .95
   pointer-events: none;
   z-index: 3;
 }
+
+
+/* Mobile navigation: drawer replaces the seven-item bottom bar. */
+.ora-mobile-drawer { background: #090a0c; border-color: var(--border); box-shadow: 24px 0 60px rgb(0 0 0 / .35); }
+.ora-mobile-menu-button { background: rgb(9 10 12 / .9); color: #b8b8c2; border: 1px solid var(--border); backdrop-filter: blur(14px); }
+.ora-mobile-menu-button:hover { color: white; background: #15161a; }
+@media (min-width: 768px) { .ora-mobile-menu-button, .ora-mobile-drawer { display: none; } }
+
+/* Feed direction: less dashboard chrome, more breathing room and content. */
+.ora-feed-page { background: #050506; }
+.ora-feed-page .ora-feed-header { border: 0; }
+.ora-feed-page .ora-feed-post { border-bottom: 1px solid var(--border-soft); background: transparent; }
+.ora-feed-page .ora-feed-post:hover { background: rgb(255 255 255 / .012); }
+.ora-feed-page .ora-feed-composer { border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; }
+.ora-feed-page .ora-feed-composer textarea { background: #0b0b0e; border-color: var(--border-soft); }
+.ora-feed-page .ora-post-actions { border-top: 0; }

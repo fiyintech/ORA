@@ -26,7 +26,7 @@ async function removeStorage(paths: string[]) {
 async function consumeOne(messageId: string, userId: string, listened = false) {
   const { data: message, error } = await admin
     .from("messages")
-    .select("id,conversation_id,sender_id,media_path,media_type,media_viewed_at")
+    .select("id,conversation_id,sender_id,media_path,media_type,media_viewed_at,media_expires_at")
     .eq("id", messageId)
     .maybeSingle();
   if (error) throw error;
@@ -44,15 +44,8 @@ async function consumeOne(messageId: string, userId: string, listened = false) {
   if (membershipError) throw membershipError;
   if (!membership) return { cleaned: false, media_path: null };
 
-  if (message.media_type === "audio" && listened) {
-    await removeStorage([message.media_path]);
-    const { error: deleteError } = await admin.from("messages").delete().eq("id", message.id);
-    if (deleteError) throw deleteError;
-    return { cleaned: true, media_path: message.media_path };
-  }
-
-  const viewedAt = new Date(message.media_viewed_at).getTime();
-  if (!Number.isFinite(viewedAt) || Date.now() - viewedAt < 12000) {
+  const expiresAt = (message as { media_expires_at?: string | null }).media_expires_at;
+  if (!expiresAt || new Date(expiresAt).getTime() > Date.now()) {
     return { cleaned: false, media_path: null };
   }
 
@@ -63,12 +56,11 @@ async function consumeOne(messageId: string, userId: string, listened = false) {
 }
 
 async function cleanupExpired() {
-  const cutoff = new Date(Date.now() - 12000).toISOString();
   const { data: expired, error } = await admin
     .from("messages")
     .select("id,media_path,media_type")
     .not("media_path", "is", null)
-    .or(`media_expires_at.lte.${new Date().toISOString()},and(media_type.neq.audio,media_viewed_at.lte.${cutoff})`)
+    .lte("media_expires_at", new Date().toISOString())
     .limit(100);
   if (error) throw error;
 

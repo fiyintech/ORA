@@ -203,7 +203,7 @@ export default function PostComposer({
   }
 
   return (
-    <div className="border-b border-zinc-900 bg-zinc-950 px-4 py-4 sm:px-5">
+    <div className="ora-feed-composer border-b border-zinc-900 bg-zinc-950 px-4 py-4 sm:px-5">
       <textarea
         value={content}
         onChange={(event) =>

@@ -7,6 +7,7 @@ type Props = {
   title?: string;
   expiresAt?: string | null;
   onClose: () => void;
+  onEnded?: () => void;
 };
 
 
@@ -28,7 +29,7 @@ async function downloadUrl(url: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
-export default function MediaLightbox({ url, type, title = "Media", expiresAt, onClose }: Props) {
+export default function MediaLightbox({ url, type, title = "Media", expiresAt, onEnded, onClose }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -92,7 +93,7 @@ export default function MediaLightbox({ url, type, title = "Media", expiresAt, o
 
       <div className="relative flex max-h-full max-w-full flex-col items-center justify-center">
         {resolvedType === "video" ? (
-          <video src={url} controls autoPlay playsInline preload="metadata" className="max-h-[82vh] max-w-[95vw] rounded-xl object-contain" />
+          <video src={url} controls autoPlay playsInline preload="metadata" onEnded={onEnded} className="max-h-[82vh] max-w-[95vw] rounded-xl object-contain" />
         ) : (
           <img src={url} alt={title} className="max-h-[82vh] max-w-[95vw] rounded-xl object-contain" />
         )}

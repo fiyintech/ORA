@@ -619,7 +619,7 @@ export default function PostCard({
   }
 
   return (
-    <article id={`post-${localPost.id}`} className="scroll-mt-20 border-b border-zinc-900 px-4 py-4 sm:px-5">
+    <article id={`post-${localPost.id}`} className="ora-feed-post scroll-mt-20 border-b border-zinc-900 px-4 py-4 sm:px-5">
       <div className="flex gap-3">
 
         {/* AVATAR */}

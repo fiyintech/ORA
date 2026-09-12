@@ -293,9 +293,9 @@ export default function FeedPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="ora-feed-page min-h-screen bg-black text-white">
       <div className="mx-auto w-full max-w-4xl px-0 py-4 sm:px-0">
-        <header className="flex items-center justify-between">
+        <header className="ora-feed-header flex items-center justify-between px-4 sm:px-5">
           <div>
             <div className="flex items-center gap-2">
               <Sparkles
@@ -338,7 +338,7 @@ export default function FeedPage() {
           </div>
         )}
 
-        <section className="mt-3 space-y-0">
+        <section className="mt-1 space-y-0">
           {loading ? (
             <div className="space-y-0" aria-live="polite" aria-busy="true">
               {[0, 1, 2].map((item) => (

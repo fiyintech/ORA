@@ -17,7 +17,7 @@ export default function Topbar() {
   return (
     <header className="ora-topbar sticky top-0 z-50 border-b backdrop-blur">
       <div className="ora-topbar-inner mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-3 sm:px-5">
-        <button type="button" onClick={() => navigate("/")} className="ora-topbar-logo shrink-0 text-xl font-bold tracking-tight text-white hover:text-violet-400" aria-label="ORA home">ORA</button>
+        <button type="button" onClick={() => navigate("/")} className="ora-topbar-logo ml-11 shrink-0 lg:ml-0 text-xl font-bold tracking-tight text-white hover:text-violet-400" aria-label="ORA home">ORA</button>
 
         <form onSubmit={submit} className="ora-desktop-search ml-auto w-full max-w-sm">
           <div className="flex h-10 items-center gap-2 rounded-full bg-zinc-900 px-4 ring-1 ring-transparent transition focus-within:ring-zinc-700">
